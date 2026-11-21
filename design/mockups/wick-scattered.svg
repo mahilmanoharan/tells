@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
+  <title>Wick, scattered state</title>
+  <!-- 96 x 96 pt. Transparent background. No rectangle behind the art. -->
+  <defs><radialGradient id="g" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#FFC75A" stop-opacity="1"/><stop offset="1" stop-color="#FFC75A" stop-opacity="0"/></radialGradient></defs>
+  <ellipse cx="48" cy="88" rx="18" ry="3" fill="#000" opacity="0.18"/>
+  <circle cx="48" cy="56" r="32" fill="url(#g)" opacity="0.3"/>
+  <g fill="none" stroke="#FFFFFF" stroke-opacity="0.85" stroke-width="4.5" stroke-linecap="round"><path d="M30 12 Q48 2 66 12"/><path d="M24 20 Q20 28 22 34"/><path d="M72 20 Q76 28 74 34"/></g>
+  <g fill="none" stroke="#2B2F33" stroke-width="2" stroke-linecap="round"><path d="M30 12 Q48 2 66 12"/><path d="M24 20 Q20 28 22 34"/><path d="M72 20 Q76 28 74 34"/></g>
+  <g transform="rotate(-10 48 14)">
+    <path d="M40 24 Q40 12 48 12 Q56 12 56 24" fill="none" stroke="#4A3526" stroke-width="3"/>
+    <path d="M32 30 L48 22 L64 30 Z" fill="#7A5A3E" stroke="#2B2F33" stroke-width="2" stroke-linejoin="round"/>
+    <rect x="31" y="30" width="34" height="46" rx="6" fill="#FFE3A3" stroke="#2B2F33" stroke-width="2.5"/>
+    <path d="M48 30 L48 76" stroke="#4A3526" stroke-width="1.5" opacity="0.5"/>
+    <path d="M41 46 Q50 54 50 62 Q49 68 46 68 Q42 68 41 62 Q38 54 41 46 Z" fill="#FF9F2E" opacity="0.35"/>
+    <path d="M56 46 Q58 56 56 62 Q53 68 50 68 Q46 67 46 62 Q47 54 56 46 Z" fill="#FF9F2E" stroke="#C2601A" stroke-width="1.2"/>
+    <path d="M54 54 Q55 59 53 62 Q51 65 50 64 Q48 62 49 60 Q51 57 54 54 Z" fill="#FFF1B8"/>
+    <rect x="29" y="74" width="38" height="7" rx="2" fill="#7A5A3E" stroke="#2B2F33" stroke-width="2"/>
+  </g>
+</svg>

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96">
+  <title>Wick, drifting state</title>
+  <!-- 96 x 96 pt. Transparent background. No rectangle behind the art. -->
+  <defs><radialGradient id="g" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#FFC75A" stop-opacity="1"/><stop offset="1" stop-color="#FFC75A" stop-opacity="0"/></radialGradient></defs>
+  <ellipse cx="48" cy="88" rx="18" ry="3" fill="#000" opacity="0.18"/>
+  <circle cx="48" cy="56" r="24" fill="url(#g)" opacity="0.2"/>
+  <g transform="rotate(6 48 14)">
+    <path d="M40 24 Q40 12 48 12 Q56 12 56 24" fill="none" stroke="#4A3526" stroke-width="3"/>
+    <path d="M32 30 L48 22 L64 30 Z" fill="#7A5A3E" stroke="#2B2F33" stroke-width="2" stroke-linejoin="round"/>
+    <rect x="31" y="30" width="34" height="46" rx="6" fill="#E9D3A0" stroke="#2B2F33" stroke-width="2.5"/>
+    <path d="M48 30 L48 76" stroke="#4A3526" stroke-width="1.5" opacity="0.5"/>
+    <path d="M48 56 Q53 62 52 65 Q51 68 48 68 Q45 68 44 65 Q43 62 48 56 Z" fill="#E8892E" stroke="#B0581A" stroke-width="1.2"/>
+    <path d="M48 61 Q50 64 49.5 66 Q49 67 48 67 Q47 67 46.5 66 Q46 64 48 61 Z" fill="#FFE6A0"/>
+    <rect x="29" y="74" width="38" height="7" rx="2" fill="#7A5A3E" stroke="#2B2F33" stroke-width="2"/>
+  </g>
+  <path d="M70 34 q3 -3 6 0 t6 0" fill="none" stroke="#FFFFFF" stroke-opacity="0.85" stroke-width="4.3" stroke-linecap="round"/>
+  <path d="M70 34 q3 -3 6 0 t6 0" fill="none" stroke="#2B2F33" stroke-width="1.8" stroke-linecap="round"/>
+</svg>

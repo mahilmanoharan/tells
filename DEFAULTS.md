@@ -25,3 +25,5 @@ Type: `two-way` (easy to change later) or `one-way` (difficult to change later).
 | D-017 | App Sandbox | App Sandbox on. Hardened Runtime on. | Sandbox off | Safer by default. Change it before Phase 2, because the data folder moves. | two-way | keep |
 | D-018 | Companion selection | The Architect selects the concept in P0.4. | The Designer selects | `AUTO_APPROVE_DESIGN=true`, and the Architect owns `DECISIONS.md`. | two-way | keep |
 | D-019 | Commit message | `<task ID>: <short summary>` on branch `main` | Conventional Commits | Hard rule 9 needs the task ID. | two-way | keep |
+| D-020 | Companion mock-up format | One static 96 x 96 pt SVG key frame for each state. The text gives the motion. | Animated SVG or SpriteKit test scenes | Static SVG is simple to review. The Builder makes the motion in P4.1. | two-way | |
+| D-021 | Companion click interaction | Click: short reaction, then a radial menu. Drag moves the companion. Click again or Esc closes the menu. A click in Asleep wakes it first. | Right-click opens the menu; left-click does nothing | PLAN.md Section 4.4 says that a click opens a radial menu. Drag must not open it. | two-way | |
