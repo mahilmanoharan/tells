@@ -1,0 +1,17 @@
+# State
+
+## Open tasks
+Phase 0: P0.1, P0.2, P0.3, P0.4, P0.5
+Phase 1: P1.1, P1.2, P1.3, P1.4, P1.5
+
+## Open gates
+None.
+
+## Conflicts and failed tasks
+None.
+
+## Log (last 10 lines)
+Move older lines to `log/`.
+
+| Date | Task | Style | Result | Retries | Tokens |
+| --- | --- | --- | --- | --- | --- |
