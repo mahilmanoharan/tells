@@ -47,13 +47,15 @@ Only `FeatureRow`, `DailyRow`, `DailySummary` and `CheckIn` values go to disk (h
 | --- | --- |
 | Mac sleep | `NSWorkspace.willSleepNotification`, `didWakeNotification` |
 | Lid close (D-045) | Mac sleep, or the IOKit `IOPMrootDomain` property `AppleClamshellState` changes to true (interest message `kIOPMMessageClamshellStateChange`, public `IOKit/pwr_mgt` headers). The sensors also stop in clamshell mode with an external display. |
-| Screen lock (D-038) | `com.apple.screenIsLocked`, `com.apple.screenIsUnlocked` (distributed notifications) |
+| Display sleep (D-038, D-047) | `NSWorkspace.screensDidSleepNotification`, `screensDidWakeNotification`. Screen lock puts the displays to sleep after the display sleep time. |
+| User session not active (D-038, D-047) | `NSWorkspace.sessionDidResignActiveNotification`, `sessionDidBecomeActiveNotification` (fast user switching, login window) |
 | User pause | Menu bar "Pause Tells" (D-041) |
 | App quit | `NSApplication.willTerminateNotification` |
 
 - When a sensor stops, it finishes its stream. `WindowClock` closes the current window as a partial window.
 - Each partial window records its coverage (Section 4.2). A window with less than 60 s of coverage is not saved (D-036).
 - Each `Task` that a view starts stops when the view closes (check 8).
+- All stop sources are public and documented (design/hardware.md). Tells does not use the undocumented screen lock distributed notifications (D-047, DEC-14).
 
 ## 2. Protocols
 
@@ -413,7 +415,7 @@ The selected concept is Sprout (design/companion-concepts.md, Concept C; DEC-1).
 
 | State | Trigger | Priority |
 | --- | --- | --- |
-| Asleep | Tells is paused, or the Mac sleeps, or the screen is locked | 1 (highest) |
+| Asleep | Tells is paused, or the Mac sleeps, or the displays sleep, or the user session is not active | 1 (highest) |
 | Social | `sound` sensor detects speech or laughter (Phase 5) | 2 |
 | Scattered | `appswitch.switch_count` of the last window is 10 or more and over the 90th percentile of the last 14 days (D-037) | 3 |
 | Drifting | `DriftDetector` gives `drifting` | 4 |

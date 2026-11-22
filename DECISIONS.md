@@ -89,3 +89,9 @@ Date: 2026-11-21
 Options: delete rows with a day before today minus 30 days, at start and at day close; delete by row age in hours
 Decision: The first option (SPEC.md Section 4.3).
 Reason: Whole days are simple to test and match the day features.
+
+## DEC-14: Screen lock stop source
+Date: 2026-11-21
+Options: undocumented distributed notifications `com.apple.screenIsLocked` and `com.apple.screenIsUnlocked` in `SensorHub`; public `NSWorkspace` display sleep and session notifications; an optional plugin with the undocumented notifications, behind a flag
+Decision: Public `NSWorkspace` display sleep and session notifications (SPEC.md 1.4, D-047). No plugin for the undocumented notifications.
+Reason: Hard rule 5 does not let `SensorHub` use undocumented APIs. The public notifications are in the macOS SDK headers (`AppKit/NSWorkspace.h`) and cover display sleep, fast user switching and the login window.
