@@ -2,3 +2,4 @@ task_id,style,first_pass,retries,tokens,minutes,defaults_changed
 P1.1,outcome,yes,0,121500,4,
 P1.2,steps,yes,0,187400,6,
 P1.5,steps,yes,0,118000,4,
+P1.3,steps,yes,0,97300+review,,
