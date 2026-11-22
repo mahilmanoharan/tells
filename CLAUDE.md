@@ -14,7 +14,7 @@ If a task conflicts with a rule, stop. Write the conflict in `STATE.md`.
 6. Do not make medical claims in the app text.
 7. Do not change the model, its features or its target outside a gate.
 8. Do not push to a remote repository unless `config.env` sets `ALLOW_PUSH=true`.
-9. Make one commit for each completed task. Start the message with the task ID: `P1.2: <summary>`.
+9. Make one commit for each completed task. Use one short line: `P1.2: <summary>`. Add no co-author trailer or tool name.
 10. If a task fails 3 times, stop work on it. Write the cause in `STATE.md`. Select a different task.
 
 ## Defaults
@@ -37,7 +37,9 @@ Phase 1 makes these paths. Until P1.1 is done, they do not exist.
 Run from the repository root.
 
 - Make the Xcode project: `xcodegen generate`
-- Run all tests: `scripts/test.sh` (after P1.5). Add `--tsan` for Thread Sanitizer.
+- Run all tests: `scripts/test.sh`. It runs 5 steps, runs all of them even after a failure, and prints `PASS` or `FAIL <n> failed step(s): <names>` last. Logs are in `.build/test-logs/`.
+- Run all tests with Thread Sanitizer: `scripts/test.sh --tsan` (skips the iOS build).
+- Test the app: `xcodebuild test -project Tells.xcodeproj -scheme Tells -destination 'platform=macOS'`
 - Test the core only: `swift test --package-path TellsCore`
 - Test Mac packages: `swift test --package-path TellsMac`
 - Build the app: `xcodebuild build -project Tells.xcodeproj -scheme Tells -destination 'platform=macOS'`
