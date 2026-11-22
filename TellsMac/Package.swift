@@ -14,6 +14,7 @@ let package = Package(
     targets: [
         .target(name: "MacSensors", dependencies: ["TellsCore"]),
         .target(name: "CompanionUI", dependencies: ["TellsCore"]),
+        .testTarget(name: "MacSensorsTests", dependencies: ["MacSensors", "TellsCore"]), // DEFAULT: D-004
         .testTarget(name: "CompanionUITests", dependencies: ["CompanionUI", "TellsCore"]), // DEFAULT: D-004
     ],
     swiftLanguageModes: [.v6]
