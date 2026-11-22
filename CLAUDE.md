@@ -19,7 +19,7 @@ If a task conflicts with a rule, stop. Write the conflict in `STATE.md`.
 
 ## Defaults
 If a detail is not specified, select a starter default (PLAN.md Section 2, GD).
-Write it in `DEFAULTS.md`. Put `// DEFAULT: D-<id>` in the code at that location.
+Write it in `DEFAULTS.md` and leave the Answer column empty (only the operator fills it). Put `// DEFAULT: D-<id>` in the code.
 If the default is one-way, do not use it. Open a GD gate in `GATES.md` and stop.
 
 ## Package map

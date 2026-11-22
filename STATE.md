@@ -25,4 +25,4 @@ Move older lines to `log/`.
 | 2026-11-21 | P2.6 | outcome | pass | 1 | 181.3k |
 | 2026-11-21 | P2.7 | steps | pass | 0 | 133.5k |
 | 2026-11-21 | P2.8 | outcome | pass | 1 | 203.0k |
-| 2026-11-21 | P2.2a | steps | pass | 0 | 99.3k + review |
+| 2026-11-21 | P2.2a | steps | pass | 0 | 122.5k |
