@@ -57,6 +57,8 @@ private struct MenuBarContent: View {
             Button("Resume Tells") { model.resume() }
         }
         Button("Permissions…") { model.showOnboarding() }
+        Button("Export CSV for Gate…") { chooseFolderAndExport() }
+            .disabled(!model.canExport)
         Button("Delete All Data…") { confirmAndDeleteAllData() }
         Divider()
         Button("Quit Tells") { NSApplication.shared.terminate(nil) }
@@ -77,5 +79,23 @@ extension MenuBarContent {
         alert.addButton(withTitle: "Cancel")
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         Task { try? await model.deleteAllData() }
+    }
+
+    /// Folder panel, then `exportGateCSV(to:)`, then one result alert.
+    // DEFAULT: D-078
+    @MainActor
+    private func chooseFolderAndExport() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Export"
+        guard panel.runModal() == .OK, let folder = panel.url else { return }
+        Task {
+            let alert = NSAlert()
+            alert.messageText = await model.exportGateCSV(to: folder)
+            alert.runModal()
+        }
     }
 }

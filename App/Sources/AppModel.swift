@@ -96,6 +96,21 @@ final class AppModel {
         onShowCheckIn?()
     }
 
+    /// The CSV export needs the store. Until P2.8 sets it, the menu item is off.
+    var canExport: Bool { store != nil }
+
+    /// Writes the 3 gate CSV files for the last 30 days into `folder`. Returns one short result line.
+    // DEFAULT: D-078
+    func exportGateCSV(to folder: URL) async -> String {
+        guard let store else { return "Export failed: no store." }
+        do {
+            let urls = try await CSVExport.exportAll(from: store, days: today.adding(days: -29)...today, to: folder)
+            return "Exported \(urls.count) files."
+        } catch {
+            return "Export failed: \(error.localizedDescription)"
+        }
+    }
+
     /// The Tells day starts at 04:00 (DEC-3). Before 04:00 it is still the day before.
     // DEFAULT: D-076
     var today: TellsDay {
