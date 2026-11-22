@@ -22,4 +22,16 @@ No report yet.
 No report yet.
 
 ## GD gates (one-way defaults)
-None.
+
+| Gate | Status | Opens |
+| --- | --- | --- |
+| GD-1 App Sandbox for private sensors | not open | Before P5.2 starts |
+
+### GD-1 App Sandbox for private sensors
+Opened by: P0.4 (Architect). Not open yet. It does not block Phases 1 to 4.
+Question: Can the app turn App Sandbox off for the private sensors in P5.2 to P5.4?
+Facts: design/hardware.md says the trackpad wrapper needs App Sandbox off, and the IOKit paths for light and motion can need it off. DEC-9 keeps App Sandbox on with no network entitlement in Phases 1 to 4.
+Why one-way: Sandbox off moves the store out of the app container, and the system no longer blocks network calls (hard rule 4).
+Options: (a) keep App Sandbox on and drop sensors that need it off; (b) a separate helper without sandbox for the private sensors only; (c) App Sandbox off for the app.
+Recommendation: (a) first. Test each private sensor in the sandbox. Use (b) only if the operator wants that sensor.
+Decision: none yet.

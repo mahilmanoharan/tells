@@ -38,3 +38,16 @@ Type: `two-way` (easy to change later) or `one-way` (difficult to change later).
 | D-030 | Haptic low day | Labeled day 1 point or more below the 30-day mean. One `.levelChange` bump; two bumps for the lowest day. Visual marks as fallback. | Bottom 25% of 30-day labels | A 1-point drop on a 1-5 scale is easy to explain. | two-way | |
 | D-031 | What-if slider set | Bedtime and late scrolling, only if the model uses the feature. Range: the user's 30-day minimum to maximum. | Fixed ranges (21:00 to 02:00) | The model has no data outside the user's range. | two-way | |
 | D-032 | Typing sound mapping | 30 s for one day. One bar for each typing window. 2 to 8 ticks from mean key interval; swing from variation; volume from key count. Synthesized 5 ms 1 kHz click. | One beat for each hour | It is short and needs no audio files. | two-way | |
+| D-033 | Raw buffer size | 20,000 samples for each sensor, oldest written over | Size from window length | Two windows of fast typing fit. | two-way | |
+| D-034 | Activity probe rate | `secondsSinceLastEventType` each 1 s | Each 5 s | 1 s gives exact idle gaps at low cost. | two-way | |
+| D-035 | IKI and hold limits | Pause: IKI over 2000 ms. Hold over 2000 ms dropped. Statistics need 10 or more values. | 1500 ms | Common pause cut-off in typing studies. | two-way | |
+| D-036 | Partial windows | Do not save a row with less than 60 s of coverage | Save all partial windows | Very short windows give noisy values. | two-way | |
+| D-037 | Scattered trigger | `appswitch.switch_count` 10 or more and over the 14-day 90th percentile, in the last window | Fixed 15 switches | It adapts to the user and has a floor. | two-way | |
+| D-038 | State priority and stop events | Asleep, Social, Scattered, Drifting, Normal. Screen lock also stops sensors and shows Asleep. | Drifting before Scattered | Asleep must win. Locked time is not Mac use. | two-way | |
+| D-039 | Drift input | `keyboard.iki_median_ms`, log value, same hour plus or minus 1, last 14 usable days | `keyboard.iki_sd_ms` | Median is stable with few key presses. | two-way | |
+| D-040 | Companion frame rate | 30 fps maximum. Scene paused in Asleep. | 60 fps | Helps to keep idle CPU under 2%. | two-way | |
+| D-041 | Pause options | Menu bar "Pause Tells": 1 hour, until tomorrow, until resumed | One on/off switch | Short pauses are common. | two-way | |
+| D-042 | Private sensor flags | `UserDefaults` key `flag.<sensor>`, off by default | Build-time compiler flag | The operator can test without a new build. | two-way | |
+| D-043 | CSV export layout | 3 files: `windows.csv`, `days.csv`, `checkins.csv`. One column for each feature. | One long file | Wide files open directly in pandas. | two-way | |
+| D-044 | No-permission sensor text | One onboarding sentence for `activity` and `appswitch` together | No text | The user knows all data that Tells records. | two-way | |
+| D-045 | Lid close signal | `IOPMrootDomain` interest notification `kIOPMMessageClamshellStateChange`, then read `AppleClamshellState`. Sensors stop when it is true, also in clamshell mode. | Poll `AppleClamshellState` each 5 s | One notification, no polling. Confirm on the build Mac in P2.2. | two-way | |
