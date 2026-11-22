@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import TellsCore
 @testable import Tells
 
 @MainActor
@@ -94,5 +95,24 @@ struct AppModelTests {
         model.resume()
         #expect(!model.isPaused)
         #expect(model.pauseState == .notPaused)
+    }
+
+    @Test func deleteAllDataClearsTheStore() async throws {
+        let (model, _) = makeModel(at: date(2026, 11, 21, 10))
+        let store = InMemoryFeatureStore()
+        let day = TellsDay(yyyymmdd: 20261121)
+        try await store.save(DailySummary(day: day, values: [:]))
+        try await store.save(CheckIn(day: day, savedAt: date(2026, 11, 21, 9), scores: [.energy: 3]))
+        model.store = store
+
+        try await model.deleteAllData()
+
+        #expect(try await store.dailySummaries(day...day).isEmpty)
+        #expect(try await store.checkIns(day...day).isEmpty)
+    }
+
+    @Test func deleteAllDataWithoutAStoreDoesNothing() async throws {
+        let (model, _) = makeModel(at: date(2026, 11, 21, 10))
+        try await model.deleteAllData()
     }
 }

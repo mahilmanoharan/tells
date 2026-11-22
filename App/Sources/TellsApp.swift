@@ -51,8 +51,25 @@ private struct MenuBarContent: View {
             Button("Resume Tells") { model.resume() }
         }
         Button("Permissions…") { model.showOnboarding() }
+        Button("Delete All Data…") { confirmAndDeleteAllData() }
         Divider()
         Button("Quit Tells") { NSApplication.shared.terminate(nil) }
             .keyboardShortcut("q")
+    }
+}
+
+extension MenuBarContent {
+    /// One confirmation, then `deleteAllData()`.
+    // DEFAULT: D-073
+    @MainActor
+    private func confirmAndDeleteAllData() {
+        let alert = NSAlert()
+        alert.messageText = "Delete all data?"
+        alert.informativeText = "Tells deletes all saved features, daily summaries and check-ins. This cannot be undone."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Delete All Data")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        Task { try? await model.deleteAllData() }
     }
 }

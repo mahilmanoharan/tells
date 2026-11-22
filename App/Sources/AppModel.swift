@@ -31,6 +31,9 @@ final class AppModel {
     @ObservationIgnored private let registeredPermissions: [PermissionKind]
     private(set) var permissionStatuses: [PermissionKind: PermissionStatus] = [:]
 
+    /// The store for all saved features. P2.8 sets it. Until then it is nil.
+    @ObservationIgnored var store: (any FeatureStore)?
+
     /// The app sets this to open the onboarding window.
     @ObservationIgnored var onShowOnboarding: (() -> Void)?
 
@@ -127,6 +130,11 @@ final class AppModel {
             return
         }
         pauseState = .pausedUntil(end)
+    }
+
+    /// Deletes all saved data, including the daily summaries (SPEC.md 4.3). The caller asks the user first.
+    func deleteAllData() async throws {
+        try await store?.deleteAll()
     }
 
     func pauseUntilResumed() {

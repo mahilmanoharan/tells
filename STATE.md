@@ -3,7 +3,7 @@
 ## Open tasks
 Phase 0: done (G0 auto-approved)
 Phase 1: done
-Phase 2: P2.5, P2.6, P2.7, P2.8
+Phase 2: P2.6, P2.7, P2.8
 
 ## Open gates
 None.
@@ -16,9 +16,6 @@ Move older lines to `log/`.
 
 | Date | Task | Style | Result | Retries | Tokens |
 | --- | --- | --- | --- | --- | --- |
-| 2026-11-21 | P0.5 | outcome | pass (rule 5 fail found; fix P0.6) | 0 | 71.7k |
-| 2026-11-21 | P0.6 | outcome | pass | 0 | 112.5k |
-| 2026-11-21 | P1.1 | outcome | pass | 0 | 121.5k |
 | 2026-11-21 | P1.2 | steps | pass | 0 | 187.4k |
 | 2026-11-21 | P1.5 | steps | pass | 0 | 118.0k |
 | 2026-11-21 | P1.3 | steps | pass | 0 | 115.5k |
@@ -27,4 +24,5 @@ Move older lines to `log/`.
 | 2026-11-21 | P2.2 | outcome | pass | 1 | 195.2k |
 | 2026-11-21 | P2.1a | outcome | pass | 1 | 112.4k |
 | 2026-11-21 | P2.3 | steps | pass | 1 | 163.3k |
-| 2026-11-21 | P2.4 | outcome | pass | 1 | 168.7k + re-review |
+| 2026-11-21 | P2.4 | outcome | pass | 1 | 188.8k |
+| 2026-11-21 | P2.5 | steps | pass | 1 | 170.5k + re-review |
