@@ -12,6 +12,15 @@ enum PauseState: Equatable {
     case pausedUntilResumed
 }
 
+/// What `AppModel` needs from the sensor hub. A fake replaces it in tests.
+protocol CollectionControlling: Sendable {
+    func run() async
+    func setPaused(_ paused: Bool) async
+    func retryUnstarted() async
+}
+
+extension SensorHub: CollectionControlling {}
+
 /// The one app state object. The app makes it one time (SPEC.md 1.3).
 @Observable
 @MainActor
@@ -32,8 +41,19 @@ final class AppModel {
     @ObservationIgnored private let registeredPermissions: [PermissionKind]
     private(set) var permissionStatuses: [PermissionKind: PermissionStatus] = [:]
 
-    /// The store for all saved features. P2.8 sets it. Until then it is nil.
+    /// The store for all saved features. nil in tests, and when the store file cannot open.
     @ObservationIgnored var store: (any FeatureStore)?
+
+    /// A short sentence when collection could not start. nil when it runs or when nothing was asked to run.
+    private(set) var startupFailure: String?
+
+    @ObservationIgnored private let hub: (any CollectionControlling)?
+    @ObservationIgnored private let dayCloser: DayCloser?
+    @ObservationIgnored private var pauseSignals: AsyncStream<Bool>.Continuation?
+    @ObservationIgnored private var pauseTimer: Task<Void, Never>?
+    @ObservationIgnored private(set) var collectionTasks: [Task<Void, Never>] = []
+    @ObservationIgnored private var terminateObserver: (any NSObjectProtocol)?
+    @ObservationIgnored private let pauseSleep: @Sendable (TimeInterval) async throws -> Void
 
     /// The app sets this to open the onboarding window.
     @ObservationIgnored var onShowOnboarding: (() -> Void)?
@@ -47,14 +67,87 @@ final class AppModel {
         calendar: Calendar = .current,
         permissions: PermissionChecking = SystemPermissions(),
         firstStartStore: FirstStartStore = UserDefaultsFirstStartStore(),
-        registeredPermissions: [PermissionKind] = [.inputMonitoring] // Phase 1/2: only `keyboard`
+        registeredPermissions: [PermissionKind] = [.inputMonitoring], // Phase 1/2: only `keyboard`
+        hub: (any CollectionControlling)? = nil,
+        dayCloser: DayCloser? = nil,
+        pauseSleep: @escaping @Sendable (TimeInterval) async throws -> Void = { try await Task.sleep(for: .seconds($0)) }
     ) {
+        self.pauseSleep = pauseSleep
+        self.hub = hub
+        self.dayCloser = dayCloser
         self.now = now
         self.calendar = calendar
         self.permissions = permissions
         self.firstStartStore = firstStartStore
         self.registeredPermissions = registeredPermissions
         refreshPermissions()
+    }
+
+    /// The one set of Phase 2 collection objects: one store, one buffer, one clock, one hub, one day closer.
+    /// The app calls this once. Tests and the test host get a model without collection.
+    // DEFAULT: D-081
+    static func live(
+        isTestProcess: Bool = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+            || NSClassFromString("XCTestCase") != nil,
+        openStore: () throws -> SwiftDataFeatureStore = { try SwiftDataFeatureStore.open() }
+    ) -> AppModel {
+        guard !isTestProcess else { return AppModel() }
+        do {
+            let store = try openStore()
+            let extractors: [any FeatureExtractor] = [KeyboardExtractor(), ActivityExtractor(), AppSwitchExtractor()]
+            let buffer = RawEventBuffer()
+            let clock = WindowClock(buffer: buffer, extractors: extractors, store: store)
+            let hub = SensorHub(sensors: [KeyboardTimingSensor(), ActivitySensor(), AppSwitchSensor()],
+                                buffer: buffer, clock: clock)
+            let model = AppModel(hub: hub, dayCloser: DayCloser(extractors: extractors, store: store))
+            model.store = store
+            return model
+        } catch {
+            let model = AppModel()
+            model.startupFailure = "Tells could not open its store: \(error.localizedDescription)"
+            return model
+        }
+    }
+
+    /// Starts the sensors, the day closer and the permission watch. Call it once.
+    func startCollection() {
+        guard collectionTasks.isEmpty, let hub else { return }
+        let (signals, continuation) = AsyncStream<Bool>.makeStream()
+        pauseSignals = continuation
+        collectionTasks = [
+            // One task sends the pause changes in order.
+            Task { for await paused in signals { await hub.setPaused(paused) } },
+            Task { await hub.run() },
+            Task { [dayCloser] in await dayCloser?.start() },
+            // A sensor with a missing permission starts after the grant, without a restart.
+            Task { [weak self] in
+                while !Task.isCancelled {
+                    do { try await Task.sleep(for: .seconds(5)) } catch { return }
+                    guard let self else { return }
+                    guard self.pauseState == .notPaused else { continue }   // no sensor work while paused (check 8)
+                    self.refreshPermissions()
+                    await hub.retryUnstarted()
+                }
+            },
+        ]
+        terminateObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.stopCollection() }
+        }
+        sendPause()
+    }
+
+    /// Cancels the poll and the pause timer, and ends the pause signals. The hub stops itself on quit.
+    func stopCollection() {
+        collectionTasks.forEach { $0.cancel() }
+        pauseTimer?.cancel()
+        pauseTimer = nil
+        pauseSignals?.finish()
+        pauseSignals = nil
+        if let terminateObserver { NotificationCenter.default.removeObserver(terminateObserver) }
+        terminateObserver = nil
+        Task { [dayCloser] in await dayCloser?.stop() }
     }
 
     var permissionRows: [PermissionRow] {
@@ -78,7 +171,8 @@ final class AppModel {
 
     func refreshPermissions() {
         for kind in PermissionKind.allCases {
-            permissionStatuses[kind] = permissions.status(of: kind)
+            let status = permissions.status(of: kind)
+            if permissionStatuses[kind] != status { permissionStatuses[kind] = status }
         }
     }
 
@@ -156,7 +250,31 @@ final class AppModel {
     }
 
     func pause(for duration: TimeInterval) {
-        pauseState = .pausedUntil(now().addingTimeInterval(duration))
+        setPauseState(.pausedUntil(now().addingTimeInterval(duration)))
+    }
+
+    /// Sets the state and tells the hub. A timed pause resumes by itself at its end.
+    private func setPauseState(_ state: PauseState) {
+        pauseState = state
+        pauseTimer?.cancel()
+        pauseTimer = nil
+        if case .pausedUntil(let end) = state {
+            let sleep = pauseSleep
+            pauseTimer = Task { [weak self, now] in
+                do { try await sleep(max(0, end.timeIntervalSince(now()))) } catch { return }
+                self?.pauseEnded(at: end)
+            }
+        }
+        sendPause()
+    }
+
+    private func pauseEnded(at end: Date) {
+        guard pauseState == .pausedUntil(end) else { return }
+        setPauseState(.notPaused)
+    }
+
+    private func sendPause() {
+        pauseSignals?.yield(pauseState != .notPaused)
     }
 
     /// Ends at the next local 04:00, the day boundary of DEC-3.
@@ -164,10 +282,10 @@ final class AppModel {
         // DEFAULT: D-056
         let boundary = DateComponents(hour: 4, minute: 0)
         guard let end = calendar.nextDate(after: now(), matching: boundary, matchingPolicy: .nextTime) else {
-            pauseState = .pausedUntilResumed
+            setPauseState(.pausedUntilResumed)
             return
         }
-        pauseState = .pausedUntil(end)
+        setPauseState(.pausedUntil(end))
     }
 
     /// Deletes all saved data, including the daily summaries (SPEC.md 4.3). The caller asks the user first.
@@ -176,10 +294,10 @@ final class AppModel {
     }
 
     func pauseUntilResumed() {
-        pauseState = .pausedUntilResumed
+        setPauseState(.pausedUntilResumed)
     }
 
     func resume() {
-        pauseState = .notPaused
+        setPauseState(.notPaused)
     }
 }

@@ -39,6 +39,32 @@ struct WindowClockTests {
         await rig.clock.stop(at: t0.addingTimeInterval(300))
     }
 
+    // DEFAULT: D-080
+    @Test func lateSensorCoversOnlyTheTimeSinceItStarted() async throws {
+        let rig = Rig()
+        await rig.clock.start(sensors: [.activity], at: t0)
+        await rig.clock.add(sensors: [.keyboard], at: t0.addingTimeInterval(240))
+        await rig.clock.closeWindow(at: t0.addingTimeInterval(300))
+        let late = try await rig.rows(.keyboard)
+        #expect(late.count == 1)
+        #expect(late.first?.coverageSeconds == 60)
+        #expect(late.first?.windowStart == t0.addingTimeInterval(240))
+        #expect(try await rig.rows(.activity).first?.coverageSeconds == 300)
+        await rig.clock.stop(at: t0.addingTimeInterval(300))
+    }
+
+    @Test func sensorThatStartsUnder60SecondsBeforeTheCloseGivesNoRow() async throws {
+        let rig = Rig()
+        await rig.clock.start(sensors: [.activity], at: t0)
+        await rig.clock.add(sensors: [.keyboard], at: t0.addingTimeInterval(270))
+        await rig.clock.closeWindow(at: t0.addingTimeInterval(300))
+        #expect(try await rig.rows(.keyboard).isEmpty)
+        #expect(try await rig.rows(.activity).count == 1)
+        await rig.clock.closeWindow(at: t0.addingTimeInterval(600))
+        #expect(try await rig.rows(.keyboard).last?.coverageSeconds == 300)   // entry cleared after the close
+        await rig.clock.stop(at: t0.addingTimeInterval(600))
+    }
+
     @Test func windowUnder60SecondsOfCoverageGivesNoRow() async throws {
         let short = Rig()
         await short.clock.start(sensors: [.keyboard], at: t0)

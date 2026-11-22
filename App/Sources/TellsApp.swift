@@ -11,7 +11,7 @@ struct TellsApp: App {
     private let checkIn: CheckInWindowController
 
     init() {
-        let model = AppModel()
+        let model = AppModel.live()
         let panel = CompanionPanelController()
         model.onCompanionVisibilityChange = { [weak panel] isVisible in
             panel?.setVisible(isVisible)
@@ -24,6 +24,7 @@ struct TellsApp: App {
         let checkIn = CheckInWindowController(model: model)
         model.onShowCheckIn = { [weak checkIn] in checkIn?.show() }
         self.checkIn = checkIn
+        model.startCollection()
         _model = State(initialValue: model)
         companionPanel = panel
     }
@@ -45,6 +46,10 @@ private struct MenuBarContent: View {
     var body: some View {
         Button(model.isCompanionVisible ? "Hide Companion" : "Show Companion") {
             model.toggleCompanion()
+        }
+        if let failure = model.startupFailure {
+            Text(failure)
+            Divider()
         }
         Button("Check in") { model.showCheckIn() }
             .disabled(!model.canCheckIn)

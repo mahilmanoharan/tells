@@ -17,6 +17,7 @@ public actor WindowClock {
 
     private var running: Set<SensorID> = []
     private var windowStart: Date?
+    private var sensorStart: [SensorID: Date] = [:]   // late sensors, until the window closes
     private var lastAppCategory: Double?      // in memory only; stop clears it (D-066)
     private var loop: Task<Void, Never>?
 
@@ -39,10 +40,21 @@ public actor WindowClock {
     public func start(sensors: Set<SensorID>, at time: Date) async {
         await endLoop()
         running = sensors
+        sensorStart = [:]
         windowStart = time
         lastAppCategory = nil
         guard !sensors.isEmpty else { return }
         loop = Task { [weak self] in await self?.runLoop() }
+    }
+
+    /// Adds sensors that started at `time`, after the window opened. Their row in this window covers
+    /// only the time from `time` to the close, and is skipped under 60 s.
+    // DEFAULT: D-080
+    public func add(sensors: Set<SensorID>, at time: Date) {
+        guard windowStart != nil else { return }
+        running.formUnion(sensors)
+        for sensor in sensors { sensorStart[sensor] = time }
+        if loop == nil { loop = Task { [weak self] in await self?.runLoop() } }
     }
 
     /// Closes the current window as a partial window. It clears the buffer and the last app category.
@@ -52,6 +64,7 @@ public actor WindowClock {
             await close(window: DateInterval(start: start, end: max(start, time)), carryOver: false)
         }
         running = []
+        sensorStart = [:]
         windowStart = nil
         lastAppCategory = nil
         await buffer.removeAll()
@@ -94,17 +107,17 @@ public actor WindowClock {
 
     private func close(window: DateInterval, carryOver: Bool) async {
         let sensors = running
-        var inputs: [(any FeatureExtractor, [SensorSample])] = []
+        var inputs: [(any FeatureExtractor, [SensorSample], DateInterval)] = []
         for sensor in sensors.sorted(by: { $0.rawValue < $1.rawValue }) {
             guard let extractor = extractors[sensor] else { continue }
-            inputs.append((extractor, await buffer.samples(for: sensor, in: window)))
+            let own = DateInterval(start: min(window.end, max(window.start, sensorStart[sensor] ?? window.start)), end: window.end)
+            inputs.append((extractor, await buffer.samples(for: sensor, in: own), own))
         }
+        sensorStart = [:]
         if let category = Self.lastCategory(in: inputs.first { $0.0.sensor == .appswitch }?.1 ?? []) {
             lastAppCategory = category
         }
-        if window.duration >= Self.minimumCoverage {
-            for row in await extractRows(inputs, window: window) { await save(row) }
-        }
+        for row in await extractRows(inputs.filter { $0.2.duration >= Self.minimumCoverage }) { await save(row) }
         for sensor in sensors { await buffer.removeSamples(for: sensor, before: window.end) }
         if carryOver, sensors.contains(.appswitch), let category = lastAppCategory {
             // D-066: the next window starts with the app that is in front.
@@ -117,11 +130,12 @@ public actor WindowClock {
     }
 
     /// Each extractor runs on its own background task.
-    private func extractRows(_ inputs: [(any FeatureExtractor, [SensorSample])], window: DateInterval) async -> [FeatureRow] {
-        let offset = calendar.timeZone.secondsFromGMT(for: window.start) / 60
-        let day = TellsDay(window.start, calendar: calendar)
+    private func extractRows(_ inputs: [(any FeatureExtractor, [SensorSample], DateInterval)]) async -> [FeatureRow] {
+        let calendar = calendar
         return await withTaskGroup(of: FeatureRow.self) { group in
-            for (extractor, samples) in inputs {
+            for (extractor, samples, window) in inputs {
+                let offset = calendar.timeZone.secondsFromGMT(for: window.start) / 60
+                let day = TellsDay(window.start, calendar: calendar)
                 group.addTask {
                     FeatureRow(sensor: extractor.sensor, schemaVersion: extractor.schemaVersion,
                                windowStart: window.start, utcOffsetMinutes: offset, day: day,

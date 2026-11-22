@@ -11,17 +11,19 @@ private final class FakeSensor: Sensor {
     let usesPrivateAPI = false
     private let continuation = Mutex<AsyncStream<SensorSample>.Continuation?>(nil)
     private let starts = Mutex(0)
-    private let canStart: Bool
+    private let canStartNow: Mutex<Bool>
+    private var canStart: Bool { canStartNow.withLock { $0 } }
+    func setCanStart(_ value: Bool) { canStartNow.withLock { $0 = value } }
 
     init(_ id: SensorID, canStart: Bool = true) {
         self.id = id
-        self.canStart = canStart
+        self.canStartNow = Mutex(canStart)
     }
 
     var startCount: Int { starts.withLock { $0 } }
     var isRunning: Bool { continuation.withLock { $0 != nil } }
 
-    func availability() async -> SensorAvailability { .available }
+    func availability() async -> SensorAvailability { canStart ? .available : .permissionDenied(.inputMonitoring) }
 
     func start() throws -> AsyncStream<SensorSample> {
         guard canStart else { throw SensorError.notAvailable(.notOnThisMac) }
@@ -95,6 +97,48 @@ struct SensorHubTests {
         #expect(!bad.isRunning)
         await rig.hub.shutdown()
         #expect(!good.isRunning)
+    }
+
+    @Test func sensorWithMissingPermissionDoesNotStopTheOthers() async {
+        let denied = FakeSensor(.keyboard, canStart: false)
+        let activity = FakeSensor(.activity), appSwitch = FakeSensor(.appswitch)
+        let rig = Rig(sensors: [denied, activity, appSwitch])
+        await rig.hub.run()
+        #expect(!denied.isRunning)
+        #expect(activity.isRunning && appSwitch.isRunning)
+        #expect(await rig.clock.isRunning)
+        await rig.hub.shutdown()
+    }
+
+    @Test func sensorStartsWhenThePermissionIsGrantedWithoutRestart() async {
+        let sensor = FakeSensor(.keyboard, canStart: false)
+        let other = FakeSensor(.activity)
+        let rig = Rig(sensors: [sensor, other])
+        await rig.hub.run()
+        await rig.hub.retryUnstarted()
+        #expect(!sensor.isRunning)
+        sensor.setCanStart(true)
+        await rig.hub.retryUnstarted()
+        #expect(sensor.isRunning)
+        #expect(other.startCount == 1)
+        await rig.hub.retryUnstarted()
+        #expect(sensor.startCount == 1)
+        sensor.emit(SensorSample(sensor: .keyboard, time: Date(), kind: .keyDown))
+        for _ in 0..<400 where await rig.buffer.count(for: .keyboard) == 0 { try? await Task.sleep(for: .milliseconds(5)) }
+        #expect(await rig.buffer.count(for: .keyboard) == 1)
+        await rig.hub.shutdown()
+    }
+
+    @Test func retryDoesNothingWhilePaused() async {
+        let sensor = FakeSensor(.keyboard, canStart: false)
+        let rig = Rig(sensors: [sensor])
+        await rig.hub.run()
+        await rig.hub.setPaused(true)
+        await rig.waitForEvents(1)
+        sensor.setCanStart(true)
+        await rig.hub.retryUnstarted()
+        #expect(!sensor.isRunning)
+        await rig.hub.shutdown()
     }
 
     @Test func storesSamplesFromTheStreams() async {

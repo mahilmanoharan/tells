@@ -25,6 +25,7 @@ public actor SensorHub {
 
     private var reasons: Set<StopReason> = []
     private var isRunning = false
+    private var startedIDs: Set<SensorID> = []
     private var readers: [Task<Void, Never>] = []
     private var observers: [(center: NotificationCenter, token: any NSObjectProtocol)] = []
     private var eventTask: Task<Void, Never>?
@@ -102,21 +103,38 @@ public actor SensorHub {
         guard !isRunning, reasons.isEmpty else { return }
         isRunning = true
         let startTime = now()
-        var started: Set<SensorID> = []
-        for sensor in sensors {
-            guard let stream = try? sensor.start() else { continue }
-            started.insert(sensor.id)
-            let buffer = buffer
-            readers.append(Task {
-                for await sample in stream { await buffer.append(sample) }
-            })
+        for sensor in sensors { _ = startOne(sensor) }
+        await clock.start(sensors: startedIDs, at: startTime)
+    }
+
+    /// Starts the sensor and reads its stream into the buffer. A sensor that cannot start is skipped.
+    private func startOne(_ sensor: any Sensor) -> Bool {
+        guard let stream = try? sensor.start() else { return false }
+        startedIDs.insert(sensor.id)
+        let buffer = buffer
+        readers.append(Task {
+            for await sample in stream { await buffer.append(sample) }
+        })
+        return true
+    }
+
+    /// Starts the sensors that could not start before, for example after the user grants a permission.
+    /// The app calls it when a permission may have changed. It does nothing while the hub is stopped.
+    // DEFAULT: D-080
+    public func retryUnstarted() async {
+        guard isRunning else { return }
+        var added: Set<SensorID> = []
+        for sensor in sensors where !startedIDs.contains(sensor.id) {
+            guard await sensor.availability() == .available, isRunning, !startedIDs.contains(sensor.id) else { continue }
+            if startOne(sensor) { added.insert(sensor.id) }
         }
-        await clock.start(sensors: started, at: startTime)
+        if !added.isEmpty { await clock.add(sensors: added, at: now()) }
     }
 
     private func stopSensors() async {
         guard isRunning else { return }
         isRunning = false
+        startedIDs = []
         for sensor in sensors { await sensor.stop() }
         for reader in readers { await reader.value }   // each stream is finished, so this drains it
         readers = []
