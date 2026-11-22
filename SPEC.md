@@ -30,7 +30,7 @@ The package map in `CLAUDE.md` gives the targets. These rules apply:
 6. `RawEventBuffer` deletes the samples of the closed window.
 7. At day close (04:00 local time, DEC-3), `DailyFeatureExtractor` values make one `DailyRow` and one `DailySummary` for the closed day.
 8. `DriftDetector` reads each new keyboard `FeatureRow`. It gives the drift state to `AppModel`.
-9. `ModelProvider` reads `DailyRow` values and gives predictions to the insight experiences.
+9. `ModelProvider` gives predictions to the insight experiences. For a closed day, the input is its `DailyRow`. For today, the input is `TodayFeatures` (Section 2.5, DEC-16).
 
 Only `FeatureRow`, `DailyRow`, `DailySummary` and `CheckIn` values go to disk (hard rule 1).
 
@@ -183,15 +183,19 @@ public struct CheckIn: Sendable, Equatable {         // 30 days (DEC-5)
     public let scores: [CheckInItem: Int]            // each 1...5; an absent item = skipped
 }
 
-public protocol FeatureStore: Sendable {
-    func save(_ row: FeatureRow) async throws
-    func save(_ row: DailyRow) async throws
-    func save(_ summary: DailySummary) async throws
-    func save(_ checkIn: CheckIn) async throws       // replaces the check-in of the same day
+/// Read-only access. Insight experiences get only this part (Section 2.7, DEC-16).
+public protocol FeatureReader: Sendable {
     func featureRows(_ sensor: SensorID?, in interval: DateInterval) async throws -> [FeatureRow]
     func dailyRows(_ days: ClosedRange<TellsDay>) async throws -> [DailyRow]
     func dailySummaries(_ days: ClosedRange<TellsDay>) async throws -> [DailySummary]
     func checkIns(_ days: ClosedRange<TellsDay>) async throws -> [CheckIn]
+}
+
+public protocol FeatureStore: FeatureReader {
+    func save(_ row: FeatureRow) async throws
+    func save(_ row: DailyRow) async throws
+    func save(_ summary: DailySummary) async throws
+    func save(_ checkIn: CheckIn) async throws       // replaces the check-in of the same day
     func deleteExpired(today: TellsDay) async throws  // Section 4.3
     func deleteAll() async throws
 }
@@ -214,12 +218,25 @@ public protocol ModelProvider: Sendable {
     var featureNames: [FeatureName] { get }   // the features the model uses
     var isMock: Bool { get }                  // true until G3 closes
     var modelVersion: String { get }
-    /// nil if `features` has too little data (fewer than 12 feature windows today, D-027).
-    func predict(_ features: FeatureVector, day: TellsDay) async -> Prediction?
+    /// nil if `windowCount` is less than 12 (D-027), or if a name in `featureNames` is absent (DEC-8).
+    func predict(_ features: FeatureVector, day: TellsDay, windowCount: Int) async -> Prediction?
+}
+
+/// The day features of one day, built from the saved `FeatureRow` values of that day (DEC-16).
+public struct TodayFeatures: Sendable, Equatable {
+    public let day: TellsDay
+    public let values: FeatureVector
+    public let windowCount: Int           // distinct `windowStart` values of rows with `row.day == day` (D-050)
+    /// Pure function. For each extractor, it gives the rows of its sensor to `extractDay`, then merges the vectors.
+    public static func build(day: TellsDay, rows: [FeatureRow], extractors: [any FeatureExtractor]) -> TodayFeatures
 }
 ```
 
-- `MockModelProvider` has `target == .energy` and `isMock == true`. It declares `activity.sleep_start_min` and `activity.late_input_min` (design/experiences.md Section 6). Its prediction is a fixed linear function, so tests know the answer.
+- Today's input is `TodayFeatures.build`. The caller reads the rows from 18:00 on day-1 to now with `featureRows(nil, in:)`. Then it calls `predict(t.values, day: t.day, windowCount: t.windowCount)`.
+- For a closed day, the caller uses `DailyRow.values` and the count of that day's `FeatureRow` windows. After 30 days, the rows are deleted, so the count is 0 and `predict` returns nil.
+- `build` does not read the clock or the disk. Day features that need data after "now" (for example `activity.last_input_min`) show the value so far.
+
+- `MockModelProvider` has `target == .energy` and `isMock == true`. It declares `activity.sleep_start_min` and `activity.late_input_min` (design/experiences.md Section 6). Its prediction is a fixed linear function, so tests know the answer (D-051).
 - Experiences only call `predict`. No code outside a gate task changes the model, its features or its target (hard rule 7).
 
 ### 2.6 DriftDetector (`TellsCore`)
@@ -241,10 +258,15 @@ public enum ExperienceState: Sendable, Equatable {
     case notOnThisMac(hardware: String)
 }
 
-public struct InsightContext: Sendable {             // read-only access
-    public let store: any FeatureStore
+public struct InsightContext: Sendable {             // read access, and one write: today's check-in
+    public let store: any FeatureReader                 // no save, no delete
     public let model: any ModelProvider
     public let today: TellsDay
+    public let saveCheckIn: @Sendable (CheckIn) async throws -> Void
+    public init(store: any FeatureReader, model: any ModelProvider, today: TellsDay,
+                saveCheckIn: @escaping @Sendable (CheckIn) async throws -> Void)
+    /// Gives `store` as a `FeatureReader` and sends `saveCheckIn` to `store.save(_:)`.
+    public init(store: any FeatureStore, model: any ModelProvider, today: TellsDay)
 }
 
 @MainActor
@@ -261,6 +283,7 @@ public protocol InsightExperience: AnyObject, Identifiable where ID == String {
 
 - The radial menu reads `id`, `displayName`, `glyph`, `menuOrder` and `state` (design/experiences.md Section 2).
 - `InsightContext` gives no write access to the model. It gives no access to `RawEventBuffer`.
+- The only write is `saveCheckIn`. "You vs. your Mac" and "What-if sliders" use it to save today's check-in (design/experiences.md Sections 3 and 6). Experiences cannot save rows or delete data (DEC-16).
 
 ## 3. Sensors
 

@@ -9,6 +9,7 @@ let package = Package(
     ],
     targets: [
         .target(name: "TellsCore"),
+        .testTarget(name: "TellsCoreTests", dependencies: ["TellsCore"]), // DEFAULT: D-004
     ],
     swiftLanguageModes: [.v6]
 )

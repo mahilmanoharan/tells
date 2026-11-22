@@ -101,3 +101,9 @@ Date: 2026-11-21
 Options: two SwiftPM packages (`TellsCore/`; `TellsMac/` with `MacSensors` and `CompanionUI`) and an `App/` target from `project.yml`; one package with all targets
 Decision: The first option, as in the CLAUDE.md "Package map" (D-001, D-002). Swift tools 6.2, Swift 6 language mode. `TellsMac` uses `TellsCore` by local path. `App/Resources/Info.plist` is made by XcodeGen and git ignores it. Sandbox entitlement in `App/Resources/Tells.entitlements` (D-017). Signing: D-048.
 Reason: `TellsCore` builds alone for iOS 26, and `swift build` works for each package without Xcode.
+
+## DEC-16: Check-in write in InsightContext, and today's model input
+Date: 2026-11-21
+Options: (a) `InsightContext` has `store: any FeatureStore`; `InsightContext` has `store: any FeatureReader` and one `saveCheckIn` closure. (b) `predict` reads a `FeatureVector` with a reserved window count feature; `TodayFeatures.build` makes today's vector and `predict` gets `windowCount` as a separate parameter.
+Decision: (a) `FeatureStore` now inherits the read-only `FeatureReader`. `InsightContext` has `store: any FeatureReader` and `saveCheckIn: @Sendable (CheckIn) async throws -> Void`. (b) `TodayFeatures.build(day:rows:extractors:)` is a pure function in `TellsCore`. It runs the `extractDay` of each extractor on today's rows so far. `predict(_:day:windowCount:)` gets the window count as a parameter (SPEC.md Sections 2.4, 2.5, 2.7).
+Reason: (a) "You vs. your Mac" and "What-if sliders" must save today's check-in, but no experience can save rows or delete data. (b) A `DailyRow` exists only after 04:00 on day+1. A reserved feature would put a value that is not a feature into the model input.
