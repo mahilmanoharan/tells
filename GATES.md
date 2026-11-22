@@ -10,7 +10,14 @@ The loop stops when a gate is `open`. To close a gate, do the gate work in PLAN.
 | G3 Model ship | not open | After G2 passes |
 
 ## G0 Design
-No report yet.
+Status: auto (`AUTO_APPROVE_DESIGN=true`). Reviewer: P0.5. Full report: `design/spec-review.md`.
+- Hard rules: 9 of 10 pass. Rule 5 fails: SPEC.md 1.4 uses the undocumented `com.apple.screenIsLocked` notification in `SensorHub`, with no flag.
+- Proposed fix: P0.6 (Architect) replaces it with a documented source, or puts it behind a flag. Do P0.6 before P2.2.
+- Conflicts with PLAN.md: 3, each with a reason in SPEC.md.
+  - C-1: Haptic week uses 30 days of check-ins, not daily summaries (DEC-6).
+  - C-2: 30-day deletion starts in Phase 2, not P3.4 (DEC-13). Close G1 to G3 fast, or old rows are deleted.
+  - C-3: "Rested" day and week are the highest `<target>` check-in (D-025).
+- One-way decisions DEC-1 to DEC-13 pass under auto-approval. The operator can read them in `DECISIONS.md`.
 
 ## G1 Model design
 No report yet.
