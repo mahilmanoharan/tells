@@ -38,6 +38,7 @@ public enum SampleKind: UInt8, Sendable {
     case keyDown, keyUp                 // keyboard: value 0
     case inputProbe                     // activity: value = seconds since last input
     case appActivated                   // appswitch: value = AppCategory.rawValue
+    case appFrontmost                   // appswitch: the app already in front, not a switch; value = AppCategory.rawValue
     case systemSleep, systemWake        // activity: value 0
 }
 
