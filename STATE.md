@@ -2,7 +2,7 @@
 
 ## Open tasks
 Phase 0: done (G0 auto-approved)
-Phase 1: P1.4
+Phase 1: done
 
 ## Open gates
 None.
@@ -24,4 +24,5 @@ Move older lines to `log/`.
 | 2026-11-21 | P1.1 | outcome | pass | 0 | 121.5k |
 | 2026-11-21 | P1.2 | steps | pass | 0 | 187.4k |
 | 2026-11-21 | P1.5 | steps | pass | 0 | 118.0k |
-| 2026-11-21 | P1.3 | steps | pass | 0 | 97.3k + review |
+| 2026-11-21 | P1.3 | steps | pass | 0 | 115.5k |
+| 2026-11-21 | P1.4 | steps | pass | 1 | 136.1k + re-review |

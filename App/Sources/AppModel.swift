@@ -1,5 +1,8 @@
+import AppKit
 import Foundation
+import MacSensors
 import Observation
+import TellsCore
 
 /// How long Tells is paused.
 enum PauseState: Equatable {
@@ -23,9 +26,80 @@ final class AppModel {
     @ObservationIgnored private let now: () -> Date
     @ObservationIgnored private let calendar: Calendar
 
-    init(now: @escaping () -> Date = { Date() }, calendar: Calendar = .current) {
+    @ObservationIgnored private let permissions: PermissionChecking
+    @ObservationIgnored private let firstStartStore: FirstStartStore
+    @ObservationIgnored private let registeredPermissions: [PermissionKind]
+    private(set) var permissionStatuses: [PermissionKind: PermissionStatus] = [:]
+
+    /// The app sets this to open the onboarding window.
+    @ObservationIgnored var onShowOnboarding: (() -> Void)?
+
+    /// `registeredPermissions` lists the permissions that the registered sensors need.
+    init(
+        now: @escaping () -> Date = { Date() },
+        calendar: Calendar = .current,
+        permissions: PermissionChecking = SystemPermissions(),
+        firstStartStore: FirstStartStore = UserDefaultsFirstStartStore(),
+        registeredPermissions: [PermissionKind] = [.inputMonitoring] // Phase 1/2: only `keyboard`
+    ) {
         self.now = now
         self.calendar = calendar
+        self.permissions = permissions
+        self.firstStartStore = firstStartStore
+        self.registeredPermissions = registeredPermissions
+        refreshPermissions()
+    }
+
+    var permissionRows: [PermissionRow] {
+        registeredPermissions.map { kind in
+            PermissionRow(
+                kind: kind,
+                sentence: PermissionInfo.sentence(for: kind),
+                status: permissionStatuses[kind] ?? .notAsked,
+                settingsURL: PermissionInfo.settingsURL(for: kind)
+            )
+        }
+    }
+
+    var keyboardAvailability: SensorAvailability {
+        switch permissionStatuses[.inputMonitoring] ?? .notAsked {
+        case .granted: .available
+        case .denied: .permissionDenied(.inputMonitoring)
+        case .notAsked: .permissionNotAsked(.inputMonitoring)
+        }
+    }
+
+    func refreshPermissions() {
+        for kind in PermissionKind.allCases {
+            permissionStatuses[kind] = permissions.status(of: kind)
+        }
+    }
+
+    /// Opens the onboarding window on the first start only.
+    func showOnboardingIfFirstStart() {
+        guard !firstStartStore.onboardingShown else { return }
+        firstStartStore.onboardingShown = true
+        onShowOnboarding?()
+    }
+
+    func showOnboarding() {
+        onShowOnboarding?()
+    }
+
+    /// The only place where a permission request starts. The user clicks the button.
+    func requestPermission(_ kind: PermissionKind) {
+        permissions.request(kind)
+        refreshPermissions()
+    }
+
+    var openSettings: (URL) -> Void = { NSWorkspace.shared.open($0) }
+
+    func performAction(for kind: PermissionKind) {
+        switch permissionStatuses[kind] ?? .notAsked {
+        case .notAsked: requestPermission(kind)
+        case .denied: openSettings(PermissionInfo.settingsURL(for: kind))
+        case .granted: break
+        }
     }
 
     var isPaused: Bool {
