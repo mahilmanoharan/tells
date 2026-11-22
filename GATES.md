@@ -19,6 +19,8 @@ Status: auto (`AUTO_APPROVE_DESIGN=true`). Reviewer: P0.5. Full report: `design/
   - C-3: "Rested" day and week are the highest `<target>` check-in (D-025).
 - One-way decisions DEC-1 to DEC-13 pass under auto-approval. The operator can read them in `DECISIONS.md`.
 
+Operator answer (2026-11-21): keep all Phase 0 defaults (D-020 to D-047). Accept C-1 and C-2 as SPEC.md states them. Risk of C-2: close G1 to G3 within approx. 16 days after the 14 data days, or old rows are deleted.
+
 ## G1 Model design
 No report yet.
 
