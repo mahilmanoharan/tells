@@ -4,6 +4,7 @@
 Phase 0: done (G0 auto-approved)
 Phase 1: done
 Phase 2: build done; waiting for 72-hour run (operator)
+Phase 4: P4.1, P4.2, P4.3, P4.4.1 to P4.4.7
 
 ## Open gates
 None.
