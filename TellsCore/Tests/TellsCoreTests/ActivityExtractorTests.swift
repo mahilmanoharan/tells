@@ -41,6 +41,26 @@ struct ActivityExtractorTests {
         #expect(try value(result, "activity.longest_idle_s") == 300)
     }
 
+    @Test func partialWindowKnownAnswers() throws {
+        // 120 s window. Input at 20 s and at 100 s. Leading 20, trailing 120 - 100 = 20, longest gap 80 s.
+        let partial = DateInterval(start: start, duration: 120)
+        let samples = [probe(atS: 20.5, since: 0.5), probe(atS: 100.4, since: 0.4)]
+        let result = extractor.extractWindow(samples, window: partial)
+        #expect(try value(result, "activity.input_s") == 2)
+        #expect(abs(try #require(try value(result, "activity.leading_idle_s")) - 20) < 1e-6)
+        #expect(abs(try #require(try value(result, "activity.trailing_idle_s")) - 20) < 1e-6)
+        #expect(abs(try #require(try value(result, "activity.longest_idle_s")) - 80) < 1e-6)
+    }
+
+    @Test func partialWindowWithNoInputIsIdleForItsLength() throws {
+        let partial = DateInterval(start: start, duration: 120)
+        let result = extractor.extractWindow([probe(atS: 10, since: 4000)], window: partial)
+        #expect(try value(result, "activity.input_s") == 0)
+        #expect(try value(result, "activity.leading_idle_s") == 120)
+        #expect(try value(result, "activity.trailing_idle_s") == 120)
+        #expect(try value(result, "activity.longest_idle_s") == 120)
+    }
+
     @Test func longestIdleCanBeInTheMiddle() throws {
         let samples = [probe(atS: 10.5, since: 0.5), probe(atS: 250.5, since: 0.5)]
         let result = extractor.extractWindow(samples, window: window)
@@ -253,5 +273,26 @@ struct ActivityExtractorTests {
     @Test func gapOfExactlyOneHourIsABreak() throws {
         let rows = [activityRow(600, first: 0, last: 300), activityRow(665, first: 0, last: 300)]   // 605 to 665
         #expect(try value(extractor.extractDay(rows, day: dayD), "activity.break_count") == 1)
+    }
+
+    @Test func partialWindowBeforeAStopJoinsTheGapAtItsRealEnd() throws {
+        // Full window at 10:00 (600 min), input at 0 s and 300 s: last input 605.
+        // Partial 120 s window at 10:05 (605 min), input at 30 s only: first = last = 605.5, trailing 90 s.
+        // Stop at 10:07. No rows for 30 min. Full window at 10:37 (637 min), first input at 0 s: 637.
+        // Gap 1: 605 to 605.5 = 0.5 min (no break). Gap 2: 605.5 to 637 = 31.5 min (break).
+        // break_count = 1. longest_stretch_min = max(605.5 - 600, 647 - 637) with last input at 642 (300 s window,
+        // last input at 5 min): stretch 1 = 605.5 - 600 = 5.5, stretch 2 = 642 - 637 = 5. So 5.5. last_input_min = 642.
+        let n = { (text: String) in try! name(text) }
+        let full = activityRow(600, first: 0, last: 300)
+        let partial = FeatureRow(sensor: .activity, schemaVersion: 1,
+                                 windowStart: midnight.addingTimeInterval(605 * 60), utcOffsetMinutes: 0, day: dayD,
+                                 coverageSeconds: 120,
+                                 values: [n("activity.input_s"): 1, n("activity.leading_idle_s"): 30,
+                                          n("activity.trailing_idle_s"): 90, n("activity.longest_idle_s"): 90])
+        let later = activityRow(637, first: 0, last: 300)
+        let result = extractor.extractDay([full, partial, later], day: dayD)
+        #expect(try value(result, "activity.break_count") == 1)
+        #expect(abs(try #require(try value(result, "activity.longest_stretch_min")) - 5.5) < 1e-9)
+        #expect(abs(try #require(try value(result, "activity.last_input_min")) - 642) < 1e-9)
     }
 }

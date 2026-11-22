@@ -3,7 +3,7 @@
 ## Open tasks
 Phase 0: done (G0 auto-approved)
 Phase 1: done
-Phase 2: P2.2a
+Phase 2: build done; waiting for 72-hour run (operator)
 
 ## Open gates
 None.
@@ -16,7 +16,6 @@ Move older lines to `log/`.
 
 | Date | Task | Style | Result | Retries | Tokens |
 | --- | --- | --- | --- | --- | --- |
-| 2026-11-21 | P1.4 | steps | pass | 1 | 143.8k |
 | 2026-11-21 | P2.1 | outcome | pass | 0 | 149.8k |
 | 2026-11-21 | P2.2 | outcome | pass | 1 | 195.2k |
 | 2026-11-21 | P2.1a | outcome | pass | 1 | 112.4k |
@@ -26,3 +25,4 @@ Move older lines to `log/`.
 | 2026-11-21 | P2.6 | outcome | pass | 1 | 181.3k |
 | 2026-11-21 | P2.7 | steps | pass | 0 | 133.5k |
 | 2026-11-21 | P2.8 | outcome | pass | 1 | 203.0k |
+| 2026-11-21 | P2.2a | steps | pass | 0 | 99.3k + review |

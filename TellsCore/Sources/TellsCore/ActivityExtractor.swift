@@ -6,8 +6,6 @@ public struct ActivityExtractor: FeatureExtractor {
     public let sensor: SensorID = .activity
     public let schemaVersion = 1
 
-    // DEFAULT: D-063
-    static let windowSeconds = 300.0
     static let inputProbeLimit = 1.0           // a probe under 1 s shows input in the last 1 s
     static let breakMinSeconds = 300.0
     static let breakMaxSeconds = 3600.0
@@ -133,12 +131,14 @@ public struct ActivityExtractor: FeatureExtractor {
             let local = row.windowStart.timeIntervalSince1970 + Double(row.utcOffsetMinutes) * 60
             startMin = (local - midnight) / 60
             inputSeconds = row.values[ActivityExtractor.inputS]
+            // DEFAULT: D-082 (a window is as long as its coverage; it may be partial)
+            let endMin = startMin + row.coverageSeconds / 60
             if let leading = row.values[ActivityExtractor.leadingIdle],
                let trailing = row.values[ActivityExtractor.trailingIdle],
-               leading < ActivityExtractor.windowSeconds, trailing < ActivityExtractor.windowSeconds {
+               leading < row.coverageSeconds, trailing < row.coverageSeconds {
                 hasInput = true
                 firstInputMin = startMin + leading / 60
-                lastInputMin = startMin + (ActivityExtractor.windowSeconds - trailing) / 60
+                lastInputMin = endMin - trailing / 60
             } else {
                 hasInput = false
                 firstInputMin = 0
