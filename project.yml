@@ -48,3 +48,30 @@ targets:
         ENABLE_DEBUG_DYLIB: NO # an ad hoc debug dylib fails library validation
         DEVELOPMENT_TEAM: ""
         GENERATE_INFOPLIST_FILE: NO
+      configs:
+        Debug:
+          CODE_SIGN_ENTITLEMENTS: App/Resources/Tells.debug.entitlements # DEFAULT: D-054
+  TellsTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - App/Tests
+    dependencies:
+      - target: Tells
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.tells.TellsTests
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "-"
+        DEVELOPMENT_TEAM: ""
+        BUNDLE_LOADER: $(TEST_HOST)
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Tells.app/Contents/MacOS/Tells
+schemes:
+  Tells:
+    build:
+      targets:
+        Tells: all
+    test:
+      targets:
+        - TellsTests
