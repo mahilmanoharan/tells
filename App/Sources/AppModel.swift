@@ -1,4 +1,5 @@
 import AppKit
+import CompanionUI
 import Foundation
 import MacSensors
 import Observation
@@ -36,6 +37,9 @@ final class AppModel {
 
     /// The app sets this to open the onboarding window.
     @ObservationIgnored var onShowOnboarding: (() -> Void)?
+
+    /// The app sets this to open the check-in window.
+    @ObservationIgnored var onShowCheckIn: (() -> Void)?
 
     /// `registeredPermissions` lists the permissions that the registered sensors need.
     init(
@@ -83,6 +87,25 @@ final class AppModel {
         guard !firstStartStore.onboardingShown else { return }
         firstStartStore.onboardingShown = true
         onShowOnboarding?()
+    }
+
+    /// The check-in needs the store. Until P2.8 sets it, the menu item is off.
+    var canCheckIn: Bool { store != nil }
+
+    func showCheckIn() {
+        onShowCheckIn?()
+    }
+
+    /// The Tells day starts at 04:00 (DEC-3). Before 04:00 it is still the day before.
+    // DEFAULT: D-076
+    var today: TellsDay {
+        TellsDay(now().addingTimeInterval(-4 * 3600), calendar: calendar)
+    }
+
+    /// The context for the check-in view. nil until P2.8 sets `store`.
+    func makeInsightContext() -> InsightContext? {
+        guard let store else { return nil }
+        return InsightContext(store: store, model: MockModelProvider(), today: today)
     }
 
     func showOnboarding() {

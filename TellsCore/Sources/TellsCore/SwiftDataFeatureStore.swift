@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import Synchronization
 
 /// The store on disk (SPEC.md 4.1). All access runs on this actor, not on the main actor.
 /// `save` has no suspension point and does not check for cancellation, so a cancelled task still saves its row.
@@ -23,9 +24,14 @@ public actor SwiftDataFeatureStore: FeatureStore {
         try make(ModelConfiguration(schema: schema, isStoredInMemoryOnly: true))
     }
 
+    /// Core Data is not safe when many containers load from one schema at once (a crash in parallel tests).
+    private static let containerLock = Mutex(())
+
     private static func make(_ configuration: ModelConfiguration) throws -> SwiftDataFeatureStore {
-        SwiftDataFeatureStore(modelContainer: try ModelContainer(
-            for: schema, migrationPlan: TellsMigrationPlan.self, configurations: configuration))
+        let container = try containerLock.withLock { _ in
+            try ModelContainer(for: schema, migrationPlan: TellsMigrationPlan.self, configurations: configuration)
+        }
+        return SwiftDataFeatureStore(modelContainer: container)
     }
 
     // MARK: Save

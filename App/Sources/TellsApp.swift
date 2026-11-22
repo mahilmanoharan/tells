@@ -8,6 +8,7 @@ struct TellsApp: App {
     @State private var model: AppModel
     private let companionPanel: CompanionPanelController
     private let onboarding: OnboardingWindowController
+    private let checkIn: CheckInWindowController
 
     init() {
         let model = AppModel()
@@ -20,6 +21,9 @@ struct TellsApp: App {
         model.onShowOnboarding = { [weak onboarding] in onboarding?.show() }
         model.showOnboardingIfFirstStart()
         self.onboarding = onboarding
+        let checkIn = CheckInWindowController(model: model)
+        model.onShowCheckIn = { [weak checkIn] in checkIn?.show() }
+        self.checkIn = checkIn
         _model = State(initialValue: model)
         companionPanel = panel
     }
@@ -42,6 +46,8 @@ private struct MenuBarContent: View {
         Button(model.isCompanionVisible ? "Hide Companion" : "Show Companion") {
             model.toggleCompanion()
         }
+        Button("Check in") { model.showCheckIn() }
+            .disabled(!model.canCheckIn)
         Menu("Pause Tells") {
             Button("For 1 Hour") { model.pause(for: 3600) }
             Button("Until Tomorrow") { model.pauseUntilTomorrow() }

@@ -25,6 +25,24 @@ struct AppModelTests {
         Self.utc.date(from: DateComponents(year: y, month: m, day: d, hour: h, minute: min)) ?? .distantPast
     }
 
+    // DEFAULT: D-076
+    @Test func todayChangesAt0400() {
+        let (model, clock) = makeModel(at: date(2026, 11, 22, 1))
+        #expect(model.today == TellsDay(yyyymmdd: 20261121))
+        clock.date = date(2026, 11, 22, 3, 59)
+        #expect(model.today == TellsDay(yyyymmdd: 20261121))
+        clock.date = date(2026, 11, 22, 4)
+        #expect(model.today == TellsDay(yyyymmdd: 20261122))
+    }
+
+    @Test func checkInIsOffWithoutAStore() {
+        let (model, _) = makeModel(at: date(2026, 11, 22, 9))
+        #expect(!model.canCheckIn)
+        #expect(model.makeInsightContext() == nil)
+        model.store = InMemoryFeatureStore()
+        #expect(model.canCheckIn)
+    }
+
     @Test func companionIsVisibleAtStart() {
         #expect(AppModel().isCompanionVisible)
     }
