@@ -18,21 +18,30 @@ protocol KeyEventSource: Sendable {
 /// A listen-only `CGEvent` tap on key down and key up. It runs on its own thread, not the main thread.
 /// The callback never reads the key code, the characters or the modifier flags (hard rule 2).
 final class SystemKeyEventSource: KeyEventSource {
-    fileprivate final class Context: @unchecked Sendable {
+    fileprivate final class Context: Sendable {
         let handler: @Sendable (KeyEvent) -> Void
-        var port: CFMachPort?
+        private let port = Mutex<PortBox?>(nil) // DEFAULT: D-065 (callback thread reads, start thread writes)
+        func setPort(_ box: PortBox) { port.withLock { $0 = box } }
+        var portBox: PortBox? { port.withLock { $0 } }
         init(handler: @escaping @Sendable (KeyEvent) -> Void) { self.handler = handler }
     }
 
+    /// CFMachPort is thread-safe by Apple's CoreFoundation contract but not marked Sendable.
+    fileprivate struct PortBox: @unchecked Sendable {
+        let port: CFMachPort
+    }
+
+    /// CFRunLoop is thread-safe by Apple's CoreFoundation contract but not marked Sendable.
     private struct LoopHolder: @unchecked Sendable {
         let runLoop: CFRunLoop
         init(_ runLoop: CFRunLoop) { self.runLoop = runLoop }
     }
 
+    /// Holds CF handles that are thread-safe but not marked Sendable; the Mutex guards the struct.
     private struct Running: @unchecked Sendable {
         let context: Context
         let runLoop: CFRunLoop
-        let port: CFMachPort
+        let port: PortBox
     }
 
     private let running = Mutex<Running?>(nil)
@@ -46,13 +55,14 @@ final class SystemKeyEventSource: KeyEventSource {
             eventsOfInterest: CGEventMask(mask), callback: keyTapCallback,
             userInfo: Unmanaged.passUnretained(context).toOpaque()
         ) else { return false }
-        context.port = port
+        let portBox = PortBox(port: port)
+        context.setPort(portBox)
 
         let ready = DispatchSemaphore(value: 0)
         let loopBox = Mutex<LoopHolder?>(nil)
         let thread = Thread {
             let runLoop = CFRunLoopGetCurrent()
-            let source = CFMachPortCreateRunLoopSource(nil, port, 0)
+            let source = CFMachPortCreateRunLoopSource(nil, portBox.port, 0)
             CFRunLoopAddSource(runLoop, source, .commonModes)
             loopBox.withLock { $0 = LoopHolder(runLoop!) }
             ready.signal()
@@ -64,7 +74,7 @@ final class SystemKeyEventSource: KeyEventSource {
         ready.wait()
         guard let runLoop = loopBox.withLock({ $0 })?.runLoop else { return false }
         CGEvent.tapEnable(tap: port, enable: true)
-        running.withLock { $0 = Running(context: context, runLoop: runLoop, port: port) }
+        running.withLock { $0 = Running(context: context, runLoop: runLoop, port: portBox) }
         return true
     }
 
@@ -74,8 +84,8 @@ final class SystemKeyEventSource: KeyEventSource {
             return current
         }
         guard let old else { return }
-        CGEvent.tapEnable(tap: old.port, enable: false)
-        CFMachPortInvalidate(old.port)
+        CGEvent.tapEnable(tap: old.port.port, enable: false)
+        CFMachPortInvalidate(old.port.port)
         CFRunLoopStop(old.runLoop)
     }
 }
@@ -92,7 +102,7 @@ private func keyTapCallback(proxy: CGEventTapProxy, type: CGEventType, event: CG
     case .keyUp:
         context.handler(KeyEvent(isDown: false, isAutorepeat: false))
     case .tapDisabledByTimeout, .tapDisabledByUserInput:
-        if let port = context.port { CGEvent.tapEnable(tap: port, enable: true) }
+        if let box = context.portBox { CGEvent.tapEnable(tap: box.port, enable: true) }
     default:
         break
     }
