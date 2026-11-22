@@ -95,3 +95,9 @@ Date: 2026-11-21
 Options: undocumented distributed notifications `com.apple.screenIsLocked` and `com.apple.screenIsUnlocked` in `SensorHub`; public `NSWorkspace` display sleep and session notifications; an optional plugin with the undocumented notifications, behind a flag
 Decision: Public `NSWorkspace` display sleep and session notifications (SPEC.md 1.4, D-047). No plugin for the undocumented notifications.
 Reason: Hard rule 5 does not let `SensorHub` use undocumented APIs. The public notifications are in the macOS SDK headers (`AppKit/NSWorkspace.h`) and cover display sleep, fast user switching and the login window.
+
+## DEC-15: Package layout
+Date: 2026-11-21
+Options: two SwiftPM packages (`TellsCore/`; `TellsMac/` with `MacSensors` and `CompanionUI`) and an `App/` target from `project.yml`; one package with all targets
+Decision: The first option, as in the CLAUDE.md "Package map" (D-001, D-002). Swift tools 6.2, Swift 6 language mode. `TellsMac` uses `TellsCore` by local path. `App/Resources/Info.plist` is made by XcodeGen and git ignores it. Sandbox entitlement in `App/Resources/Tells.entitlements` (D-017). Signing: D-048.
+Reason: `TellsCore` builds alone for iOS 26, and `swift build` works for each package without Xcode.

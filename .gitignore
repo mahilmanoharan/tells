@@ -4,3 +4,4 @@ DerivedData/
 *.xcodeproj/
 xcuserdata/
 exports/
+App/Resources/Info.plist

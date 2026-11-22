@@ -1,0 +1,50 @@
+# DEFAULT: D-002 (XcodeGen makes Tells.xcodeproj; git ignores it)
+name: Tells
+options:
+  bundleIdPrefix: dev.tells
+  deploymentTarget:
+    macOS: "26.0" # DEFAULT: D-003
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+packages:
+  TellsCore:
+    path: TellsCore
+  TellsMac:
+    path: TellsMac
+targets:
+  Tells:
+    type: application
+    platform: macOS
+    sources:
+      - App/Sources
+      - path: App/Resources
+        buildPhase: none
+    dependencies:
+      - package: TellsCore
+        product: TellsCore
+      - package: TellsMac
+        product: MacSensors
+      - package: TellsMac
+        product: CompanionUI
+    info:
+      path: App/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Tells
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        LSApplicationCategoryType: public.app-category.utilities
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.tells.Tells # DEFAULT: D-016
+        PRODUCT_NAME: Tells
+        CODE_SIGN_ENTITLEMENTS: App/Resources/Tells.entitlements # DEFAULT: D-017
+        ENABLE_HARDENED_RUNTIME: YES # DEFAULT: D-017
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "-" # DEFAULT: D-048
+        OTHER_CODE_SIGN_FLAGS: "--options=runtime" # Xcode skips it for ad hoc signing
+        ENABLE_DEBUG_DYLIB: NO # an ad hoc debug dylib fails library validation
+        DEVELOPMENT_TEAM: ""
+        GENERATE_INFOPLIST_FILE: NO
