@@ -236,9 +236,9 @@ struct SensorHubTests {
                                             source: FakeKeySource(), now: { Date(timeIntervalSince1970: 100) })
         let rig = Rig(sensors: [], extra: [keyboard])
         let stream = try keyboard.start()
-        await rig.hub.setKeyboardSuppressed(true)
+        rig.hub.setKeyboardSuppressed(true)
         keyboard.handle(KeyEvent(isDown: true, isAutorepeat: false))
-        await rig.hub.setKeyboardSuppressed(false)
+        rig.hub.setKeyboardSuppressed(false)
         keyboard.handle(KeyEvent(isDown: false, isAutorepeat: false))
         await keyboard.stop()
         var kinds: [SampleKind] = []

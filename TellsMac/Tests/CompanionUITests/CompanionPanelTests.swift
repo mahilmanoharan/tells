@@ -89,7 +89,7 @@ struct SproutSceneTests {
     @Test func panelHoldsOneSKViewAndCanBeDragged() {
         let panel = CompanionPanel()
         #expect(panel.contentView is SKView)
-        #expect(panel.sceneView.mouseDownCanMoveWindow)
+        #expect(!panel.sceneView.mouseDownCanMoveWindow) // the view drags the panel itself (D-021)
     }
 
     @Test func positionSurvivesRestart() throws {

@@ -77,8 +77,53 @@ final class CompanionSKView: SKView {
         refreshPause()
     }
 
-    /// A click starts a window drag, so the panel moves by its background.
-    override var mouseDownCanMoveWindow: Bool { true }
+    /// The view moves the panel itself, so it can tell a click from a drag (D-021).
+    override var mouseDownCanMoveWindow: Bool { false }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    /// Called for a press that ends with no drag.
+    var onClick: (() -> Void)?
+
+    /// Movement under this many points is still a click.
+    // DEFAULT: D-093
+    static let dragThreshold: CGFloat = 4
+    private var press: (startMouse: NSPoint, startOrigin: NSPoint, isDrag: Bool)?
+
+    override func mouseDown(with event: NSEvent) {
+        beginPress(atScreenPoint: NSEvent.mouseLocation)
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        continuePress(toScreenPoint: NSEvent.mouseLocation)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        endPress()
+    }
+
+    func beginPress(atScreenPoint point: NSPoint) {
+        guard let origin = window?.frame.origin else { return }
+        press = (point, origin, false)
+    }
+
+    func continuePress(toScreenPoint point: NSPoint) {
+        guard var current = press else { return }
+        let dx = point.x - current.startMouse.x, dy = point.y - current.startMouse.y
+        if !current.isDrag, hypot(dx, dy) >= Self.dragThreshold { current.isDrag = true }
+        press = current
+        if current.isDrag {
+            window?.setFrameOrigin(NSPoint(x: current.startOrigin.x + dx, y: current.startOrigin.y + dy))
+        }
+    }
+
+    func endPress() {
+        guard let finished = press else { return }
+        press = nil
+        if !finished.isDrag {
+            sprout.playClickReaction()
+            onClick?()
+        }
+    }
 
     /// The host stops the render loop while the panel is hidden.
     func setSuspendedByHost(_ suspended: Bool) {
@@ -107,6 +152,12 @@ public final class CompanionPanelController: NSObject, NSWindowDelegate {
     }
 
     public var isShown: Bool { panel.isVisible }
+
+    /// A click on the companion (not a drag). The radial menu uses it.
+    public var onClick: (() -> Void)? {
+        get { panel.sceneView.onClick }
+        set { panel.sceneView.onClick = newValue }
+    }
 
     /// The state the scene shows. Default is Normal. P4.2 connects real data.
     public var state: CompanionState { panel.sceneView.sprout.state }

@@ -71,7 +71,8 @@ public actor SensorHub {
     }
 
     /// D-026: the keyboard sensor drops all key events while this is true.
-    public func setKeyboardSuppressed(_ value: Bool) {
+    /// It is not actor-isolated, so calls from the main thread keep their order.
+    public nonisolated func setKeyboardSuppressed(_ value: Bool) {
         for case let keyboard as KeyboardTimingSensor in sensors { keyboard.setSuppressed(value) }
     }
 

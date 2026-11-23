@@ -140,6 +140,19 @@ final class SproutScene: SKScene {
         }
     }
 
+    /// A short hop for a click (D-021). It takes 0.2 s.
+    // DEFAULT: D-093
+    func playClickReaction() {
+        let hop = SKAction.sequence([
+            .moveBy(x: 0, y: 5, duration: 0.1),
+            .moveBy(x: 0, y: -5, duration: 0.1),
+        ])
+        root.removeAction(forKey: Self.clickKey)
+        root.run(hop, withKey: Self.clickKey)
+    }
+
+    private static let clickKey = "click"
+
     /// The transition runs in `update`, so it needs no closure and stops when the scene pauses.
     override func update(_ currentTime: TimeInterval) {
         guard var running = transition else { return }

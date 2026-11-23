@@ -19,6 +19,8 @@ protocol CollectionControlling: Sendable {
     func retryUnstarted() async
     /// True while a sensor is not started, for example for a missing permission.
     func hasUnstartedSensors() async -> Bool
+    /// D-026: not async, so the calls from the main thread keep their order.
+    func setKeyboardSuppressed(_ value: Bool)
 }
 
 extension SensorHub: CollectionControlling {}
@@ -364,6 +366,11 @@ final class AppModel {
         case .pausedUntil(let end): now() < end
         case .pausedUntilResumed: true
         }
+    }
+
+    /// The insights window is the key window: the keyboard sensor drops key events (D-026).
+    func setInsightsWindowIsKey(_ isKey: Bool) {
+        hub?.setKeyboardSuppressed(isKey)
     }
 
     func toggleCompanion() {

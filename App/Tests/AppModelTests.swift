@@ -1,6 +1,7 @@
 import AppKit
 import CompanionUI
 import Foundation
+import Synchronization
 import Testing
 import TellsCore
 @testable import Tells
@@ -15,6 +16,8 @@ private actor FakeHub: CollectionControlling {
     func setUnstarted(_ value: Bool) { unstarted = value }
     func retryUnstarted() async { retryCount += 1 }
     func hasUnstartedSensors() async -> Bool { unstarted }
+    nonisolated let suppressCalls = Mutex<[Bool]>([])
+    nonisolated func setKeyboardSuppressed(_ value: Bool) { suppressCalls.withLock { $0.append(value) } }
 
     /// Waits until the hub has seen `count` pause calls.
     func waitForPauseCalls(_ count: Int) async -> [Bool] {

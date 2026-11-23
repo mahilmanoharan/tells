@@ -25,12 +25,30 @@ final class TellsApp {
     private let companionPanel: CompanionPanelController
     private let onboarding: OnboardingWindowController
     private let checkIn: CheckInWindowController
+    private let insights: InsightsWindowController
+    private let radialMenu: RadialMenuController
     private let menuBar: MenuBarController
 
     init() {
         let model = AppModel.live()
         let panel = CompanionPanelController()
-        model.onCompanionVisibilityChange = { [weak panel] isVisible in
+        let experiences = PlaceholderExperience.all()   // P4.4.x replaces them one by one
+        let insights = InsightsWindowController(
+            experiences: experiences, contextProvider: { [weak model] in model?.makeInsightContext() },
+            onKeyChange: { [weak model] isKey in model?.setInsightsWindowIsKey(isKey) })
+        let menu = RadialMenuController(companion: panel, experiences: experiences,
+                                        contextProvider: { [weak model] in model?.makeInsightContext() })
+        menu.onChoose = { [weak insights] id in insights?.show(experienceID: id) }
+        // The wake is visual only. Collection stays paused (D-093).
+        menu.onWake = { [weak panel] in panel?.setState(.normal) }
+        menu.onClose = { [weak panel, weak model] in
+            if let model { panel?.setState(model.companionState) }
+        }
+        panel.onClick = { [weak menu] in menu?.companionClicked() }
+        self.insights = insights
+        radialMenu = menu
+        model.onCompanionVisibilityChange = { [weak panel, weak menu] isVisible in
+            if !isVisible { menu?.close() }
             panel?.setVisible(isVisible)
         }
         model.onCompanionStateChange = { [weak panel] state in panel?.setState(state) }
