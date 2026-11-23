@@ -15,7 +15,7 @@ If a task conflicts with a rule, stop. Write the conflict in `STATE.md`.
 7. Do not change the model, its features or its target outside a gate.
 8. Do not push to a remote repository unless `config.env` sets `ALLOW_PUSH=true`.
 9. Make one commit for each completed task. Use one short, plain sentence that says what changed, for example `Fix the menu bar crash`. Do not put the task ID in it. Add no co-author trailer or tool name.
-11. After each completed task, update the "Where it's at" part of `README.md`. Keep it short and casual.
+11. After each completed task, update the "Where it's at" part of `README.md`. Keep it short and casual. Use no emojis anywhere (docs, code, commits).
 10. If a task fails 3 times, stop work on it. Write the cause in `STATE.md`. Select a different task.
 
 ## Defaults
