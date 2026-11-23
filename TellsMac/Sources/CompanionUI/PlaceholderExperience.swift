@@ -20,11 +20,11 @@ public final class PlaceholderExperience: InsightExperience {
     /// The 7 experiences in menu order.
     public static func all() -> [PlaceholderExperience] {
         let table: [(String, String, String)] = [
-            ("you-vs-mac", "You vs. your Mac", "questionmark.circle"),
-            ("typing-sound", "Typing rhythm sound", "waveform"),
-            ("ghost-racer", "Ghost racer", "keyboard"),
-            ("what-if", "What-if sliders", "slider.horizontal.3"),
-            ("haptic-week", "Haptic week", "hand.point.up.left"),
+            ("youVsMac", "You vs. your Mac", "questionmark.circle"),
+            ("typingSound", "Typing rhythm sound", "waveform"),
+            ("ghostRacer", "Ghost racer", "keyboard"),
+            ("whatIf", "What-if sliders", "slider.horizontal.3"),
+            ("hapticWeek", "Haptic week", "hand.point.up.left"),
             ("experiment", "Experiment", "flask"),
             ("nudge", "In-the-moment nudge", "bell"),
         ]

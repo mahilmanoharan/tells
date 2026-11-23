@@ -32,7 +32,9 @@ final class TellsApp {
     init() {
         let model = AppModel.live()
         let panel = CompanionPanelController()
-        let experiences = PlaceholderExperience.all()   // P4.4.x replaces them one by one
+        // P4.4.x replaces the placeholders one by one.
+        let experiences: [any InsightExperience] = [YouVsMacExperience()]
+            + PlaceholderExperience.all().filter { $0.menuOrder != 1 }
         let insights = InsightsWindowController(
             experiences: experiences, contextProvider: { [weak model] in model?.makeInsightContext() },
             onKeyChange: { [weak model] isKey in model?.setInsightsWindowIsKey(isKey) })
@@ -60,6 +62,7 @@ final class TellsApp {
         let checkIn = CheckInWindowController(model: model)
         model.onShowCheckIn = { [weak checkIn] in checkIn?.show() }
         self.checkIn = checkIn
+        YouVsMacExperience.purgeStaleForecast(today: model.today)
         model.startCollection()
         self.model = model
         menuBar = MenuBarController(model: model)

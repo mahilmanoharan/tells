@@ -152,7 +152,10 @@ final class AppModel {
         if let windowCloses {
             // A closed window changes the drift and scattered data (SPEC.md Section 5).
             collectionTasks.append(Task { [weak self] in
-                for await _ in windowCloses { await self?.refreshCompanionState() }
+                for await _ in windowCloses {
+                    if let today = self?.today { YouVsMacExperience.purgeStaleForecast(today: today) }   // D-094
+                    await self?.refreshCompanionState()
+                }
             })
         }
         observeCompanionTriggers()

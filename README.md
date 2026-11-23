@@ -12,11 +12,11 @@ Everything stays on your Mac. No keys, no text, no URLs, no window titles, no ne
 | 1. Skeleton | App, packages, tests, menu bar | done |
 | 2. Sensors | Typing timing, activity, app switches → 5‑min feature rows, daily check-in, export | done |
 | 3. Model | Train the personal model (needs ~14 days of your data) | waiting on data |
-| 4. Companion | Sprout's moods, radial menu, insight screens | Sprout, moods and click menu done, insight screens next |
+| 4. Companion | Sprout's moods, radial menu, insight screens | Sprout, moods, click menu and first insight screen done |
 | 5. More sensors | Extra Mac hardware signals | later |
 | 6. iPhone-ready | Make the core run on iOS | later |
 
-**Latest:** click Sprout and a ring of 7 buttons pops out, one per insight screen. The screens are placeholders for now; the first real one ("You vs. your Mac") is next. Works with arrow keys and VoiceOver too.
+**Latest:** the first insight screen works: "You vs. your Mac". You guess your score for today, the Mac makes its own guess, and after your check-in you see who was closer. Before the model is trained it runs in practice mode. Six more screens to go.
 
 **Your to-dos:** grant Input Monitoring, let it run for 72 hours, check in daily for 14 days.
 

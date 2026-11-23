@@ -105,11 +105,11 @@ struct RadialMenuModelTests {
         #expect(RadialMenuKey(keyCode: 36, shift: false) == .choose)
         #expect(RadialMenuKey(keyCode: 49, shift: false) == .choose)
         model.handle(.choose)
-        #expect(chosen == ["typing-sound"])
+        #expect(chosen == ["typingSound"])
     }
 
     @Test func accessibilityLabelHasNameAndState() {
-        var item = RadialMenuItem(id: "haptic-week", name: "Haptic week", glyph: "hand.point.up.left")
+        var item = RadialMenuItem(id: "hapticWeek", name: "Haptic week", glyph: "hand.point.up.left")
         #expect(item.accessibilityLabel == "Haptic week, ready")
         item.state = .notEnoughData(have: 3, need: 7, unit: "days")
         #expect(item.accessibilityLabel == "Haptic week, not enough data")
@@ -197,7 +197,7 @@ struct RadialMenuControllerTests {
         menu.open()
         menu.menuPanel.keyDown(with: try #require(keyEvent(124)))
         menu.menuPanel.keyDown(with: try #require(keyEvent(36)))
-        #expect(chosen == ["typing-sound"])
+        #expect(chosen == ["typingSound"])
         #expect(!menu.isOpen)
         companion.setVisible(false)
     }
