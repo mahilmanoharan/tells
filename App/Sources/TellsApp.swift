@@ -36,8 +36,8 @@ final class TellsApp {
         let typingSound = TypingSoundExperience(
             keyboardAvailability: { [weak model] in model?.keyboardAvailability ?? .available },
             openPermissions: { [weak model] in model?.showOnboarding() })
-        let experiences: [any InsightExperience] = [YouVsMacExperience(), typingSound]
-            + PlaceholderExperience.all().filter { $0.menuOrder > 2 }
+        let experiences: [any InsightExperience] = [YouVsMacExperience(), typingSound, GhostRacerExperience()]
+            + PlaceholderExperience.all().filter { $0.menuOrder > 3 }
         let insights = InsightsWindowController(
             experiences: experiences, contextProvider: { [weak model] in model?.makeInsightContext() },
             onKeyChange: { [weak model] isKey in model?.setInsightsWindowIsKey(isKey) })

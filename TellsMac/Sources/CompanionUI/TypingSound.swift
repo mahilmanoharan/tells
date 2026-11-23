@@ -132,7 +132,7 @@ enum TypingSoundLoader {
     }
 
     /// 1 day of margin on each side. The rows carry their own `day`, so the code filters by it.
-    private static func interval(from first: TellsDay, to last: TellsDay) -> DateInterval {
+    static func interval(from first: TellsDay, to last: TellsDay) -> DateInterval {
         let calendar = Calendar.current
         func start(_ day: TellsDay) -> Date? {
             calendar.date(from: DateComponents(year: day.yyyymmdd / 10_000, month: day.yyyymmdd / 100 % 100, day: day.yyyymmdd % 100))
