@@ -33,6 +33,7 @@ final class TellsApp {
         model.onCompanionVisibilityChange = { [weak panel] isVisible in
             panel?.setVisible(isVisible)
         }
+        model.onCompanionStateChange = { [weak panel] state in panel?.setState(state) }
         panel.setVisible(model.isCompanionVisible)
         let onboarding = OnboardingWindowController(model: model)
         model.onShowOnboarding = { [weak onboarding] in onboarding?.show() }

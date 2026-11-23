@@ -14,6 +14,7 @@ public actor WindowClock {
     private let calendar: Calendar
     private let sleepUntil: @Sendable (Date) async throws -> Void
     private let onSaveFailure: @Sendable (any Error) -> Void
+    private let onWindowClosed: @Sendable (Date) -> Void
 
     private var running: Set<SensorID> = []
     private var windowStart: Date?
@@ -26,13 +27,15 @@ public actor WindowClock {
                 sleepUntil: @escaping @Sendable (Date) async throws -> Void = { date in
                     try await Task.sleep(for: .seconds(max(0, date.timeIntervalSinceNow)))
                 },
-                onSaveFailure: @escaping @Sendable (any Error) -> Void = { _ in }) {
+                onSaveFailure: @escaping @Sendable (any Error) -> Void = { _ in },
+                onWindowClosed: @escaping @Sendable (Date) -> Void = { _ in }) {
         self.buffer = buffer
         self.extractors = Dictionary(extractors.map { ($0.sensor, $0) }, uniquingKeysWith: { first, _ in first })
         self.store = store
         self.calendar = calendar
         self.sleepUntil = sleepUntil
         self.onSaveFailure = onSaveFailure
+        self.onWindowClosed = onWindowClosed
     }
 
     /// Opens a window at `time` for the sensors that run. It ends at the next 5-minute boundary.
@@ -119,6 +122,7 @@ public actor WindowClock {
         }
         for row in await extractRows(inputs.filter { $0.2.duration >= Self.minimumCoverage }) { await save(row) }
         for sensor in sensors { await buffer.removeSamples(for: sensor, before: window.end) }
+        onWindowClosed(window.end)   // the rows are saved
         if carryOver, sensors.contains(.appswitch), let category = lastAppCategory {
             // D-066: the next window starts with the app that is in front.
             await buffer.append(SensorSample(sensor: .appswitch, time: window.end, kind: .appFrontmost, value: category))

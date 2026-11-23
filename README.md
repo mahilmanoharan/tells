@@ -12,11 +12,11 @@ Everything stays on your Mac. No keys, no text, no URLs, no window titles, no ne
 | 1. Skeleton | App, packages, tests, menu bar | done |
 | 2. Sensors | Typing timing, activity, app switches → 5‑min feature rows, daily check-in, export | done |
 | 3. Model | Train the personal model (needs ~14 days of your data) | waiting on data |
-| 4. Companion | Sprout's moods, radial menu, insight screens | Sprout scene done, rest queued |
+| 4. Companion | Sprout's moods, radial menu, insight screens | Sprout and its moods done, menu and insight screens next |
 | 5. More sensors | Extra Mac hardware signals | later |
 | 6. iPhone-ready | Make the core run on iOS | later |
 
-**Latest:** stage 2 is done. The menu-bar crash is fixed (1 h 44 min clean run), and idle CPU dropped from about 3.6% to 0.3%, mostly by drawing Sprout at a lower frame rate when it is calm. Next up: the rest of the companion (stage 4).
+**Latest:** Sprout now picks its mood from your data: calm, drifting (typing off your usual rhythm for this hour), scattered (lots of app switching) or asleep. No check-in needed for that. Next up: the click menu (P4.3).
 
 **Your to-dos:** grant Input Monitoring, let it run for 72 hours, check in daily for 14 days.
 

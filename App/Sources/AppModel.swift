@@ -60,6 +60,20 @@ final class AppModel {
     @ObservationIgnored private let permissionPollInterval: Duration
     @ObservationIgnored private let pauseSleep: @Sendable (TimeInterval) async throws -> Void
 
+    /// The state that the companion shows (SPEC.md Section 5). It follows today's data.
+    private(set) var companionState = CompanionState.normal
+
+    /// The app sets this to move the companion to a new state.
+    @ObservationIgnored var onCompanionStateChange: ((CompanionState) -> Void)?
+
+    @ObservationIgnored private var driftDetector: DriftDetector?
+    @ObservationIgnored private var systemStops: Set<SystemStop> = []
+    @ObservationIgnored private let windowCloses: AsyncStream<Date>?
+    @ObservationIgnored private var companionObservers: [(center: NotificationCenter, token: any NSObjectProtocol)] = []
+
+    /// The reasons that show Asleep besides the user pause (D-038, D-047).
+    private enum SystemStop: Hashable { case sleep, display, session }
+
     /// The app sets this to open the onboarding window.
     @ObservationIgnored var onShowOnboarding: (() -> Void)?
 
@@ -75,6 +89,7 @@ final class AppModel {
         registeredPermissions: [PermissionKind] = [.inputMonitoring], // Phase 1/2: only `keyboard`
         hub: (any CollectionControlling)? = nil,
         dayCloser: DayCloser? = nil,
+        windowCloses: AsyncStream<Date>? = nil,
         pauseSleep: @escaping @Sendable (TimeInterval) async throws -> Void = { try await Task.sleep(for: .seconds($0)) },
         permissionPollInterval: Duration = .seconds(30)   // DEFAULT: D-088
     ) {
@@ -82,6 +97,7 @@ final class AppModel {
         self.pauseSleep = pauseSleep
         self.hub = hub
         self.dayCloser = dayCloser
+        self.windowCloses = windowCloses
         self.now = now
         self.calendar = calendar
         self.permissions = permissions
@@ -103,11 +119,15 @@ final class AppModel {
             let store = try openStore()
             let extractors: [any FeatureExtractor] = [KeyboardExtractor(), ActivityExtractor(), AppSwitchExtractor()]
             let buffer = RawEventBuffer()
-            let clock = WindowClock(buffer: buffer, extractors: extractors, store: store)
+            let (closes, closeSignal) = AsyncStream<Date>.makeStream(bufferingPolicy: .bufferingNewest(1))
+            let clock = WindowClock(buffer: buffer, extractors: extractors, store: store,
+                                    onWindowClosed: { closeSignal.yield($0) })
             let hub = SensorHub(sensors: [KeyboardTimingSensor(), ActivitySensor(), AppSwitchSensor()],
                                 buffer: buffer, clock: clock)
-            let model = AppModel(hub: hub, dayCloser: DayCloser(extractors: extractors, store: store))
+            let model = AppModel(hub: hub, dayCloser: DayCloser(extractors: extractors, store: store),
+                                windowCloses: closes)
             model.store = store
+            model.driftDetector = DriftDetector(store: store)
             return model
         } catch {
             let model = AppModel()
@@ -127,6 +147,13 @@ final class AppModel {
             Task { await hub.run() },
             Task { [dayCloser] in await dayCloser?.start() },
         ]
+        if let windowCloses {
+            // A closed window changes the drift and scattered data (SPEC.md Section 5).
+            collectionTasks.append(Task { [weak self] in
+                for await _ in windowCloses { await self?.refreshCompanionState() }
+            })
+        }
+        observeCompanionTriggers()
         terminateObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.willTerminateNotification, object: nil, queue: .main
         ) { [weak self] _ in
@@ -134,6 +161,51 @@ final class AppModel {
         }
         observePermissionTriggers()
         sendPause()   // also starts the permission poll
+    }
+
+    /// The companion reads the sleep, display and session events itself, as the sensor hub does (D-038).
+    private func observeCompanionTriggers() {
+        let workspace = NSWorkspace.shared.notificationCenter
+        let pairs: [(Notification.Name, SystemStop, Bool)] = [
+            (NSWorkspace.willSleepNotification, .sleep, true), (NSWorkspace.didWakeNotification, .sleep, false),
+            (NSWorkspace.screensDidSleepNotification, .display, true), (NSWorkspace.screensDidWakeNotification, .display, false),
+            (NSWorkspace.sessionDidResignActiveNotification, .session, true),
+            (NSWorkspace.sessionDidBecomeActiveNotification, .session, false),
+        ]
+        companionObservers = pairs.map { name, stop, isStopped in
+            (workspace, workspace.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.setSystemStop(stop, isStopped) }
+            })
+        }
+    }
+
+    private func setSystemStop(_ stop: SystemStop, _ isStopped: Bool) {
+        if isStopped { systemStops.insert(stop) } else { systemStops.remove(stop) }
+        Task { await refreshCompanionState() }
+    }
+
+    /// Picks the companion state from the pause, the system stops and today's rows. The app calls it
+    /// after each window closes, and on pause, resume, sleep and wake. It reads no check-in (SPEC.md 2.6).
+    // DEFAULT: D-092
+    func refreshCompanionState() async {
+        let time = now()
+        var signals = CompanionSignals(asleep: isPaused || !systemStops.isEmpty)
+        if !signals.asleep, let store {
+            if let driftDetector { signals.drifting = await driftDetector.update(now: time) == .drifting }
+            // DEFAULT: D-091
+            let from = time.addingTimeInterval(-Double(ScatteredTrigger.historyDays + 1) * 86_400)
+            let rows = (try? await store.featureRows(.appswitch, in: DateInterval(start: from, end: time))) ?? []
+            signals.scattered = ScatteredTrigger.isScattered(rows: rows, now: time, today: today)
+        }
+        // A pause or stop may have come while the reads waited. Asleep must win.
+        if isPaused || !systemStops.isEmpty { signals = CompanionSignals(asleep: true) }
+        setCompanionState(CompanionStateRule.state(for: signals))
+    }
+
+    private func setCompanionState(_ state: CompanionState) {
+        guard state != companionState else { return }
+        companionState = state
+        onCompanionStateChange?(state)
     }
 
     /// A sensor with a missing permission starts after the grant, without a restart (D-080).
@@ -188,6 +260,8 @@ final class AppModel {
         cancelPermissionPoll()
         for (center, token) in pollObservers { center.removeObserver(token) }
         pollObservers = []
+        for (center, token) in companionObservers { center.removeObserver(token) }
+        companionObservers = []
         pauseTimer?.cancel()
         pauseTimer = nil
         pauseSignals?.finish()
@@ -323,6 +397,7 @@ final class AppModel {
     private func sendPause() {
         pauseSignals?.yield(pauseState != .notPaused)
         updatePermissionPoll()
+        Task { await refreshCompanionState() }
     }
 
     /// Ends at the next local 04:00, the day boundary of DEC-3.

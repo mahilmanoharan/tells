@@ -1,3 +1,5 @@
+import AppKit
+import CompanionUI
 import Foundation
 import Testing
 import TellsCore
@@ -243,4 +245,166 @@ struct AppModelTests {
         #expect(result.hasPrefix("Export failed:"))
         #expect(!FileManager.default.fileExists(atPath: missing.path))
     }
+}
+
+@MainActor
+struct CompanionStateTests {
+    private static let utc: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC") ?? .gmt
+        return calendar
+    }()
+
+    private static let noon = utc.date(from: DateComponents(year: 2026, month: 11, day: 22, hour: 12)) ?? .distantPast
+
+    private let switchCount = FeatureName("appswitch.switch_count")!
+
+    private func switchRow(minutesBefore: Double, count: Double) -> FeatureRow {
+        let start = Self.noon.addingTimeInterval(-minutesBefore * 60)
+        return FeatureRow(sensor: .appswitch, schemaVersion: 1, windowStart: start, utcOffsetMinutes: 0,
+                          day: TellsDay(start, calendar: Self.utc), coverageSeconds: 300,
+                          values: [switchCount: count])
+    }
+
+    private func makeModel() -> (AppModel, InMemoryFeatureStore, StateLog) {
+        let model = AppModel(now: { Self.noon }, calendar: Self.utc)
+        let store = InMemoryFeatureStore()
+        model.store = store
+        let log = StateLog()
+        model.onCompanionStateChange = { log.states.append($0) }
+        return (model, store, log)
+    }
+
+    final class StateLog { var states: [CompanionState] = [] }
+
+    @Test func manySwitchesGiveScattered() async throws {
+        let (model, store, log) = makeModel()
+        try await store.save(switchRow(minutesBefore: 5, count: 15))
+        await model.refreshCompanionState()
+        #expect(model.companionState == .scattered)
+        #expect(log.states == [.scattered])
+    }
+
+    @Test func noDataGivesNormalAndNoChange() async {
+        let (model, _, log) = makeModel()
+        await model.refreshCompanionState()
+        #expect(model.companionState == .normal)
+        #expect(log.states.isEmpty)
+    }
+
+    @Test func pauseGivesAsleepAndResumeGivesTheDataState() async throws {
+        let (model, store, _) = makeModel()
+        try await store.save(switchRow(minutesBefore: 5, count: 15))
+        model.pauseUntilResumed()
+        await model.refreshCompanionState()
+        #expect(model.companionState == .asleep)
+        model.resume()
+        await model.refreshCompanionState()
+        #expect(model.companionState == .scattered)
+    }
+
+    // MARK: real triggers
+
+    private func waitFor(_ state: CompanionState, _ model: AppModel) async -> Bool {
+        for _ in 0..<400 where model.companionState != state { try? await Task.sleep(for: .milliseconds(5)) }
+        return model.companionState == state
+    }
+
+    private func makeRunningModel() throws -> (AppModel, InMemoryFeatureStore, AsyncStream<Date>.Continuation) {
+        let (closes, signal) = AsyncStream<Date>.makeStream()
+        let model = AppModel(now: { Self.noon }, calendar: Self.utc, hub: FakeHub(), windowCloses: closes)
+        let store = InMemoryFeatureStore()
+        model.store = store
+        model.startCollection()
+        return (model, store, signal)
+    }
+
+    private func post(_ name: Notification.Name) {
+        NSWorkspace.shared.notificationCenter.post(name: name, object: nil)
+    }
+
+    @Test func aClosedWindowUpdatesTheCompanion() async throws {
+        let (model, store, signal) = try makeRunningModel()
+        defer { model.stopCollection() }
+        try await store.save(switchRow(minutesBefore: 5, count: 15))
+        signal.yield(Self.noon)
+        #expect(await waitFor(.scattered, model))
+    }
+
+    @Test func pauseGivesAsleepAndResumeGoesBack() async throws {
+        let (model, store, _) = try makeRunningModel()
+        defer { model.stopCollection() }
+        try await store.save(switchRow(minutesBefore: 5, count: 15))
+        model.pauseUntilResumed()
+        #expect(await waitFor(.asleep, model))
+        model.resume()
+        #expect(await waitFor(.scattered, model))
+    }
+
+    @Test func sleepAndWakeChangeTheCompanion() async throws {
+        let (model, _, _) = try makeRunningModel()
+        defer { model.stopCollection() }
+        post(NSWorkspace.willSleepNotification)
+        #expect(await waitFor(.asleep, model))
+        post(NSWorkspace.didWakeNotification)
+        #expect(await waitFor(.normal, model))
+    }
+
+    @Test func displaySleepAndSessionChangeGiveAsleep() async throws {
+        let (model, _, _) = try makeRunningModel()
+        defer { model.stopCollection() }
+        post(NSWorkspace.screensDidSleepNotification)
+        #expect(await waitFor(.asleep, model))
+        post(NSWorkspace.screensDidWakeNotification)
+        #expect(await waitFor(.normal, model))
+        post(NSWorkspace.sessionDidResignActiveNotification)
+        #expect(await waitFor(.asleep, model))
+        post(NSWorkspace.sessionDidBecomeActiveNotification)
+        #expect(await waitFor(.normal, model))
+    }
+
+    @Test func aSlowRefreshCannotOverwriteAsleep() async throws {
+        let slow = GatedStore()
+        let model = AppModel(now: { Self.noon }, calendar: Self.utc)
+        model.store = slow
+        try await slow.save(switchRow(minutesBefore: 5, count: 15))
+        await slow.closeGate()
+        let refresh = Task { await model.refreshCompanionState() }
+        await slow.waitUntilBlocked()
+        model.pauseUntilResumed()   // the pause comes while the read waits
+        #expect(await waitFor(.asleep, model))
+        await slow.openGate()
+        await refresh.value
+        #expect(model.companionState == .asleep)
+    }
+}
+
+/// A store whose `appswitch` read waits at a gate. It makes a refresh slow, for the race test.
+private actor GatedStore: FeatureStore {
+    private let inner = InMemoryFeatureStore()
+    private var isClosed = false
+    private var isBlocked = false
+    private var waiter: CheckedContinuation<Void, Never>?
+
+    func closeGate() { isClosed = true }
+    func openGate() { isClosed = false; waiter?.resume(); waiter = nil }
+    func waitUntilBlocked() async { while !isBlocked { try? await Task.sleep(for: .milliseconds(2)) } }
+
+    func featureRows(_ sensor: SensorID?, in interval: DateInterval) async throws -> [FeatureRow] {
+        let rows = try await inner.featureRows(sensor, in: interval)
+        if sensor == .appswitch, isClosed {
+            isBlocked = true
+            await withCheckedContinuation { waiter = $0 }
+        }
+        return rows
+    }
+    func dailyRows(_ days: ClosedRange<TellsDay>) async throws -> [DailyRow] { try await inner.dailyRows(days) }
+    func dailySummaries(_ days: ClosedRange<TellsDay>) async throws -> [DailySummary] { try await inner.dailySummaries(days) }
+    func checkIns(_ days: ClosedRange<TellsDay>) async throws -> [CheckIn] { try await inner.checkIns(days) }
+    func save(_ row: FeatureRow) async throws { try await inner.save(row) }
+    func save(_ row: DailyRow) async throws { try await inner.save(row) }
+    func save(_ summary: DailySummary) async throws { try await inner.save(summary) }
+    func save(_ checkIn: CheckIn) async throws { try await inner.save(checkIn) }
+    func deleteExpired(today: TellsDay) async throws { try await inner.deleteExpired(today: today) }
+    func deleteAll() async throws { try await inner.deleteAll() }
 }
