@@ -117,9 +117,11 @@ struct SensorHubTests {
         await rig.hub.run()
         await rig.hub.retryUnstarted()
         #expect(!sensor.isRunning)
+        #expect(await rig.hub.hasUnstartedSensors())   // D-088: the app polls while this is true
         sensor.setCanStart(true)
         await rig.hub.retryUnstarted()
         #expect(sensor.isRunning)
+        #expect(await !rig.hub.hasUnstartedSensors())
         #expect(other.startCount == 1)
         await rig.hub.retryUnstarted()
         #expect(sensor.startCount == 1)

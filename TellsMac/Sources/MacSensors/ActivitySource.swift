@@ -17,7 +17,11 @@ protocol ActivitySource: Sendable {
 
 /// Public APIs only: `CGEventSource.secondsSinceLastEventType`, polled each 1 s (D-034),
 /// and the `NSWorkspace` sleep and wake notifications. It needs no permission.
+/// The timer is parked while the Mac sleeps and set again on wake (check 8).
 final class SystemActivitySource: ActivitySource {
+    static let probeInterval = 1.0
+    static let timerLeeway = DispatchTimeInterval.milliseconds(100)
+
     private struct Running: @unchecked Sendable {
         let timer: DispatchSourceTimer
         let observers: [any NSObjectProtocol]
@@ -29,15 +33,24 @@ final class SystemActivitySource: ActivitySource {
     func start(handler: @escaping @Sendable (ActivityEvent) -> Void) {
         stop()
         let timer = DispatchSource.makeTimerSource(queue: queue)
-        timer.schedule(deadline: .now() + 1, repeating: 1, leeway: .milliseconds(100))
+        let arm: @Sendable () -> Void = {
+            timer.schedule(deadline: .now() + Self.probeInterval, repeating: Self.probeInterval, leeway: Self.timerLeeway)
+        }
+        arm()
         timer.setEventHandler {
             handler(.probe(secondsSinceInput: Self.secondsSinceAnyInput()))
         }
         timer.resume()
         let center = NSWorkspace.shared.notificationCenter
         let observers = [
-            center.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: nil) { _ in handler(.sleep) },
-            center.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: nil) { _ in handler(.wake) },
+            center.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: nil) { [queue] _ in
+                queue.async { timer.schedule(deadline: .distantFuture, repeating: .never) }   // no timer fires while asleep
+                handler(.sleep)
+            },
+            center.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: nil) { [queue] _ in
+                handler(.wake)
+                queue.async { arm() }
+            },
         ]
         running.withLock { $0 = Running(timer: timer, observers: observers) }
     }

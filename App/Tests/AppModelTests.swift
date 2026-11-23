@@ -8,7 +8,11 @@ private actor FakeHub: CollectionControlling {
     private(set) var runCount = 0
     func run() async { runCount += 1 }
     func setPaused(_ paused: Bool) async { pausedCalls.append(paused) }
-    func retryUnstarted() async {}
+    private(set) var retryCount = 0
+    var unstarted = false
+    func setUnstarted(_ value: Bool) { unstarted = value }
+    func retryUnstarted() async { retryCount += 1 }
+    func hasUnstartedSensors() async -> Bool { unstarted }
 
     /// Waits until the hub has seen `count` pause calls.
     func waitForPauseCalls(_ count: Int) async -> [Bool] {
@@ -160,6 +164,39 @@ struct AppModelTests {
         model.pause(for: 3600)
         #expect(await hub.waitForPauseCalls(4) == [false, true, false, true])
         #expect(await hub.runCount == 1)
+    }
+
+    // D-088: no poll when no sensor waits.
+    @Test func permissionPollStopsWhenNoSensorWaits() async {
+        let hub = FakeHub()
+        let model = AppModel(hub: hub, permissionPollInterval: .milliseconds(10))
+        model.startCollection()
+        try? await Task.sleep(for: .milliseconds(150))
+        #expect(await hub.retryCount == 1)   // one check at start, then no timer
+        model.stopCollection()
+    }
+
+    // D-088: a waiting sensor is retried each interval, never while paused, and again after the resume.
+    @Test func permissionPollRunsOnlyWhileASensorWaitsAndNotWhilePaused() async {
+        let hub = FakeHub()
+        await hub.setUnstarted(true)
+        let model = AppModel(hub: hub, permissionPollInterval: .milliseconds(10))
+        model.startCollection()
+        try? await Task.sleep(for: .milliseconds(150))
+        #expect(await hub.retryCount > 3)
+        model.pauseUntilResumed()
+        try? await Task.sleep(for: .milliseconds(50))
+        let atPause = await hub.retryCount
+        try? await Task.sleep(for: .milliseconds(150))
+        #expect(await hub.retryCount == atPause)   // no work while paused (check 8)
+        model.resume()
+        try? await Task.sleep(for: .milliseconds(150))
+        #expect(await hub.retryCount > atPause)
+        model.stopCollection()
+        try? await Task.sleep(for: .milliseconds(50))
+        let atStop = await hub.retryCount
+        try? await Task.sleep(for: .milliseconds(100))
+        #expect(await hub.retryCount == atStop)
     }
 
     @Test func failedStoreOpenSetsTheStartupFailure() {

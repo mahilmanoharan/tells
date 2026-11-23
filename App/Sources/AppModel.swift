@@ -17,6 +17,8 @@ protocol CollectionControlling: Sendable {
     func run() async
     func setPaused(_ paused: Bool) async
     func retryUnstarted() async
+    /// True while a sensor is not started, for example for a missing permission.
+    func hasUnstartedSensors() async -> Bool
 }
 
 extension SensorHub: CollectionControlling {}
@@ -53,6 +55,9 @@ final class AppModel {
     @ObservationIgnored private var pauseTimer: Task<Void, Never>?
     @ObservationIgnored private(set) var collectionTasks: [Task<Void, Never>] = []
     @ObservationIgnored private var terminateObserver: (any NSObjectProtocol)?
+    @ObservationIgnored private var permissionPoll: Task<Void, Never>?
+    @ObservationIgnored private var pollObservers: [(center: NotificationCenter, token: any NSObjectProtocol)] = []
+    @ObservationIgnored private let permissionPollInterval: Duration
     @ObservationIgnored private let pauseSleep: @Sendable (TimeInterval) async throws -> Void
 
     /// The app sets this to open the onboarding window.
@@ -70,8 +75,10 @@ final class AppModel {
         registeredPermissions: [PermissionKind] = [.inputMonitoring], // Phase 1/2: only `keyboard`
         hub: (any CollectionControlling)? = nil,
         dayCloser: DayCloser? = nil,
-        pauseSleep: @escaping @Sendable (TimeInterval) async throws -> Void = { try await Task.sleep(for: .seconds($0)) }
+        pauseSleep: @escaping @Sendable (TimeInterval) async throws -> Void = { try await Task.sleep(for: .seconds($0)) },
+        permissionPollInterval: Duration = .seconds(30)   // DEFAULT: D-088
     ) {
+        self.permissionPollInterval = permissionPollInterval
         self.pauseSleep = pauseSleep
         self.hub = hub
         self.dayCloser = dayCloser
@@ -119,28 +126,68 @@ final class AppModel {
             Task { for await paused in signals { await hub.setPaused(paused) } },
             Task { await hub.run() },
             Task { [dayCloser] in await dayCloser?.start() },
-            // A sensor with a missing permission starts after the grant, without a restart.
-            Task { [weak self] in
-                while !Task.isCancelled {
-                    do { try await Task.sleep(for: .seconds(5)) } catch { return }
-                    guard let self else { return }
-                    guard self.pauseState == .notPaused else { continue }   // no sensor work while paused (check 8)
-                    self.refreshPermissions()
-                    await hub.retryUnstarted()
-                }
-            },
         ]
         terminateObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.willTerminateNotification, object: nil, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.stopCollection() }
         }
-        sendPause()
+        observePermissionTriggers()
+        sendPause()   // also starts the permission poll
+    }
+
+    /// A sensor with a missing permission starts after the grant, without a restart (D-080).
+    /// The app checks when it becomes active and when the Mac wakes. While a sensor waits, it checks each 30 s.
+    /// No check runs while the app is paused, while the Mac sleeps, or when no sensor waits (check 8).
+    // DEFAULT: D-088
+    private func observePermissionTriggers() {
+        let app = NotificationCenter.default
+        let workspace = NSWorkspace.shared.notificationCenter
+        pollObservers = [
+            (app, app.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.updatePermissionPoll() }
+            }),
+            (workspace, workspace.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.cancelPermissionPoll() }
+            }),
+            (workspace, workspace.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.updatePermissionPoll(firstCheckAfterInterval: true) }
+            }),
+        ]
+    }
+
+    /// Starts the check loop again. It ends by itself when no sensor waits, and it never runs while paused.
+    func updatePermissionPoll(firstCheckAfterInterval: Bool = false) {
+        permissionPoll?.cancel()
+        permissionPoll = nil
+        guard let hub, !collectionTasks.isEmpty, pauseState == .notPaused else { return }
+        let interval = permissionPollInterval
+        permissionPoll = Task { [weak self] in
+            var delay = firstCheckAfterInterval
+            while !Task.isCancelled {
+                if delay {
+                    do { try await Task.sleep(for: interval, tolerance: interval / 3) } catch { return }
+                }
+                delay = true
+                guard let self, !Task.isCancelled, self.pauseState == .notPaused else { return }
+                self.refreshPermissions()
+                await hub.retryUnstarted()
+                guard await hub.hasUnstartedSensors() else { return }
+            }
+        }
+    }
+
+    private func cancelPermissionPoll() {
+        permissionPoll?.cancel()
+        permissionPoll = nil
     }
 
     /// Cancels the poll and the pause timer, and ends the pause signals. The hub stops itself on quit.
     func stopCollection() {
         collectionTasks.forEach { $0.cancel() }
+        cancelPermissionPoll()
+        for (center, token) in pollObservers { center.removeObserver(token) }
+        pollObservers = []
         pauseTimer?.cancel()
         pauseTimer = nil
         pauseSignals?.finish()
@@ -275,6 +322,7 @@ final class AppModel {
 
     private func sendPause() {
         pauseSignals?.yield(pauseState != .notPaused)
+        updatePermissionPoll()
     }
 
     /// Ends at the next local 04:00, the day boundary of DEC-3.

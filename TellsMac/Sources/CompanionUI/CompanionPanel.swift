@@ -34,21 +34,48 @@ public final class CompanionPanel: NSPanel {
 final class CompanionSKView: SKView {
     let sprout = SproutScene(size: CGSize(width: SproutScene.side, height: SproutScene.side))
     private var isSuspendedByHost = false
+    private var isOccluded = false
+    private var occlusionObserver: (any NSObjectProtocol)?
+
+    /// Calm states: Normal, Drifting and Asleep. The sway is slow, so a low rate looks the same. Idle CPU cost.
+    // DEFAULT: D-089
+    static let calmFramesPerSecond = 8
+    static let livelyFramesPerSecond = 30
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         allowsTransparency = true
-        preferredFramesPerSecond = 15 // Normal state; DEFAULT: D-040, D-085
+        preferredFramesPerSecond = Self.calmFramesPerSecond // Normal state; DEFAULT: D-040, D-085, D-089
         ignoresSiblingOrder = true
         presentScene(sprout)
         sprout.onPauseChange = { [weak self] _ in self?.refreshPause() }
         sprout.onStateChange = { [weak self] state in
-            // DEFAULT: D-085
-            self?.preferredFramesPerSecond = state == .scattered || state == .social ? 30 : 15
+            // DEFAULT: D-085, D-089
+            self?.preferredFramesPerSecond = state == .scattered || state == .social
+                ? Self.livelyFramesPerSecond : Self.calmFramesPerSecond
         }
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    /// The render loop also stops while the panel is fully covered, on another Space, or the screen is off.
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if let occlusionObserver { NotificationCenter.default.removeObserver(occlusionObserver) }
+        occlusionObserver = nil
+        guard let window else { return }
+        occlusionObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main
+        ) { [weak self] note in
+            guard let window = note.object as? NSWindow else { return }
+            MainActor.assumeIsolated { self?.setOccluded(!window.occlusionState.contains(.visible)) }
+        }
+    }
+
+    private func setOccluded(_ occluded: Bool) {
+        isOccluded = occluded
+        refreshPause()
+    }
 
     /// A click starts a window drag, so the panel moves by its background.
     override var mouseDownCanMoveWindow: Bool { true }
@@ -60,7 +87,7 @@ final class CompanionSKView: SKView {
     }
 
     private func refreshPause() {
-        isPaused = isSuspendedByHost || sprout.isPaused
+        isPaused = isSuspendedByHost || isOccluded || sprout.isPaused
     }
 }
 

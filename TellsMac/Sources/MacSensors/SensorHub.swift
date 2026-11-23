@@ -131,6 +131,11 @@ public actor SensorHub {
         if !added.isEmpty { await clock.add(sensors: added, at: now()) }
     }
 
+    /// True while a sensor is not started. The app polls for a permission only while this is true (D-088).
+    public func hasUnstartedSensors() -> Bool {
+        sensors.contains { !startedIDs.contains($0.id) }
+    }
+
     private func stopSensors() async {
         guard isRunning else { return }
         isRunning = false
