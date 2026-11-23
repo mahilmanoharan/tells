@@ -33,8 +33,11 @@ final class TellsApp {
         let model = AppModel.live()
         let panel = CompanionPanelController()
         // P4.4.x replaces the placeholders one by one.
-        let experiences: [any InsightExperience] = [YouVsMacExperience()]
-            + PlaceholderExperience.all().filter { $0.menuOrder != 1 }
+        let typingSound = TypingSoundExperience(
+            keyboardAvailability: { [weak model] in model?.keyboardAvailability ?? .available },
+            openPermissions: { [weak model] in model?.showOnboarding() })
+        let experiences: [any InsightExperience] = [YouVsMacExperience(), typingSound]
+            + PlaceholderExperience.all().filter { $0.menuOrder > 2 }
         let insights = InsightsWindowController(
             experiences: experiences, contextProvider: { [weak model] in model?.makeInsightContext() },
             onKeyChange: { [weak model] isKey in model?.setInsightsWindowIsKey(isKey) })
