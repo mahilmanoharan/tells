@@ -45,7 +45,7 @@ final class AppModel {
     @ObservationIgnored var store: (any FeatureStore)?
 
     /// A short sentence when collection could not start. nil when it runs or when nothing was asked to run.
-    private(set) var startupFailure: String?
+    var startupFailure: String?
 
     @ObservationIgnored private let hub: (any CollectionControlling)?
     @ObservationIgnored private let dayCloser: DayCloser?

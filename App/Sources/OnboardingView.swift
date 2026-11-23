@@ -51,15 +51,10 @@ final class OnboardingWindowController {
     func show() {
         model.refreshPermissions()
         if window == nil {
-            let hosting = NSHostingController(rootView: OnboardingView(model: model) { [weak self] in
-                self?.window?.close()
-            })
-            let newWindow = NSWindow(contentViewController: hosting)
-            newWindow.title = "Tells Permissions"
-            newWindow.styleMask = [.titled, .closable]
-            newWindow.isReleasedWhenClosed = false
-            newWindow.center()
-            window = newWindow
+            window = makeFixedSizeWindow(
+                title: "Tells Permissions",
+                content: OnboardingView(model: model) { [weak self] in self?.window?.close() }
+            )
         }
         NSApplication.shared.activate()
         window?.makeKeyAndOrderFront(nil)

@@ -21,13 +21,9 @@ final class CheckInWindowController {
                 self?.window?.close()
             }
         })
-        let hosting = NSHostingController(rootView: CheckInView(model: checkIn))
-        let newWindow = window ?? NSWindow(contentViewController: hosting)
-        newWindow.contentViewController = hosting
-        newWindow.title = "Tells Check-in"
-        newWindow.styleMask = [.titled, .closable]
-        newWindow.isReleasedWhenClosed = false
-        if window == nil { newWindow.center() }
+        // The form is always 380 pt wide. A new form for each opening needs a new window.
+        window?.close()
+        let newWindow = makeFixedSizeWindow(title: "Tells Check-in", content: CheckInView(model: checkIn))
         window = newWindow
         NSApplication.shared.activate()
         newWindow.makeKeyAndOrderFront(nil)
