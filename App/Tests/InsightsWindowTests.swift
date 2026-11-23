@@ -60,6 +60,38 @@ struct InsightsWindowTests {
         #expect(controller.currentID == nil)
     }
 
+    /// D-096: after close, the insights window holds no hosting view. The next open builds a new one.
+    @Test func insightsWindowFreesItsHostingViewAfterClose() async throws {
+        let one = StoppableExperience(id: "one", displayName: "One")
+        let controller = InsightsWindowController(experiences: [one], contextProvider: { nil }, onKeyChange: { _ in })
+        controller.show(experienceID: "one")
+        let first = try #require(controller.window)
+        #expect(first.contentViewController is NSHostingController<InsightsRootView>)
+        first.close()
+        #expect(one.stops == 1)
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(first.contentViewController == nil)
+        #expect(controller.window == nil)
+        controller.show(experienceID: "one")
+        let second = try #require(controller.window)
+        #expect(second !== first)
+        #expect(second.contentViewController is NSHostingController<InsightsRootView>)
+        second.close()
+    }
+
+    @Test func checkInWindowFreesItsHostingViewAfterClose() async throws {
+        let model = AppModel()
+        model.store = InMemoryFeatureStore()
+        let controller = CheckInWindowController(model: model)
+        controller.show()
+        let window = try #require(controller.window)
+        #expect(window.contentViewController is NSHostingController<CheckInView>)
+        window.close()
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(window.contentViewController == nil)
+        #expect(controller.window == nil)
+    }
+
     /// D-026: while the insights window is the key window, the hub suppresses keyboard events.
     @Test func keyWindowSuppressesTheKeyboardSensor() throws {
         let hub = FakeSuppressHub()

@@ -75,6 +75,15 @@ final class InsightsWindowController: NSObject, NSWindowDelegate {
         stopCurrent()
         content.view = AnyView(EmptyView())
         onKeyChange(false)
+        // D-096: no hosting view stays after close. The next show() builds a new window.
+        guard let closing = notification.object as? NSWindow, closing === window else { return }
+        releaseHostingContentAfterClose(of: closing) { [weak self] in
+            guard let self else { return }
+            closing.delegate = nil
+            observers.forEach { NotificationCenter.default.removeObserver($0) }
+            observers = []
+            window = nil
+        }
     }
 
     /// Stops the Task work, audio and haptics of the open experience (check 8).
@@ -84,7 +93,7 @@ final class InsightsWindowController: NSObject, NSWindowDelegate {
     }
 }
 
-private struct InsightsRootView: View {
+struct InsightsRootView: View {
     let content: InsightsContent
 
     var body: some View {

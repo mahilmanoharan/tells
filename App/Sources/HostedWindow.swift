@@ -6,7 +6,7 @@ import SwiftUI
 /// That loop has the same risk as the 2026-11-21 22:29 crash: an `NSInternalInconsistencyException`
 /// from `NSHostingView.windowDidLayout`. An empty set stops the loop:
 /// the window gets its size one time, from the fitting size of the view.
-// DEFAULT: D-086
+// DEFAULT: D-086, D-096
 @MainActor
 func makeFixedSizeWindow<Content: View>(title: String, content: Content) -> NSWindow {
     let hosting = NSHostingController(rootView: content)
@@ -19,4 +19,15 @@ func makeFixedSizeWindow<Content: View>(title: String, content: Content) -> NSWi
     window.isReleasedWhenClosed = false
     window.center()
     return window
+}
+
+/// Frees the SwiftUI hosting view of a closed window one run loop turn after the close (D-096).
+/// `release` runs only if the window is still closed then, so a fast reopen keeps its content.
+@MainActor
+func releaseHostingContentAfterClose(of window: NSWindow, release: @escaping @MainActor () -> Void) {
+    Task { @MainActor [weak window] in
+        guard let window, !window.isVisible else { return }
+        window.contentViewController = nil
+        release()
+    }
 }
