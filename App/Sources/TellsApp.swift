@@ -36,11 +36,14 @@ final class TellsApp {
         let typingSound = TypingSoundExperience(
             keyboardAvailability: { [weak model] in model?.keyboardAvailability ?? .available },
             openPermissions: { [weak model] in model?.showOnboarding() })
-        let experiences: [any InsightExperience] = [YouVsMacExperience(), typingSound, GhostRacerExperience()]
-            + PlaceholderExperience.all().filter { $0.menuOrder > 3 }
+        let whatIf = WhatIfExperience()
+        let experiences: [any InsightExperience] = [YouVsMacExperience(), typingSound, GhostRacerExperience(), whatIf]
+            + PlaceholderExperience.all().filter { $0.menuOrder > 4 }
         let insights = InsightsWindowController(
             experiences: experiences, contextProvider: { [weak model] in model?.makeInsightContext() },
             onKeyChange: { [weak model] isKey in model?.setInsightsWindowIsKey(isKey) })
+        // "Test it" opens the Experiment. P4.4.6 selects the matching change.
+        whatIf.openExperiment = { [weak insights] _ in insights?.show(experienceID: "experiment") }
         let menu = RadialMenuController(companion: panel, experiences: experiences,
                                         contextProvider: { [weak model] in model?.makeInsightContext() })
         menu.onChoose = { [weak insights] id in insights?.show(experienceID: id) }
