@@ -126,6 +126,14 @@ struct YouVsMacStorage {
 
     func hasForecast() -> Bool { defaults.object(forKey: Key.forecastDay) != nil || defaults.object(forKey: Key.forecastValue) != nil }
 
+    /// Deletes the forecast and both scores ("Delete all data", SPEC.md 4.3).
+    func clearAll() {
+        for key in [Key.forecastDay, Key.forecastValue] { defaults.removeObject(forKey: key) }
+        for pool in ["practice", "real"] {
+            for part in ["you", "mac", "tie", "scoredDay"] { defaults.removeObject(forKey: Key.score(pool, part)) }
+        }
+    }
+
     func clearPracticeScore() {
         for part in ["you", "mac", "tie", "scoredDay"] { defaults.removeObject(forKey: Key.score("practice", part)) }
     }
@@ -384,6 +392,11 @@ public final class YouVsMacExperience: InsightExperience {
     /// removes the forecast within one window. The view and `state(in:)` call it too.
     public static func purgeStaleForecast(today: TellsDay, defaults: UserDefaults = .standard) {
         YouVsMacStorage(defaults: defaults).purgeForecast(before: today)
+    }
+
+    /// Deletes the forecast and the scores. "Delete all data" calls it (SPEC.md 4.3).
+    public static func clearStoredState(defaults: UserDefaults = .standard) {
+        YouVsMacStorage(defaults: defaults).clearAll()
     }
 
     /// Today's prediction is not read before today's check-in is saved. This experience uses no permission and no hardware.

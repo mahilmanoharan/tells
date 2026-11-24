@@ -152,6 +152,26 @@ struct AppModelTests {
         #expect(try await store.checkIns(day...day).isEmpty)
     }
 
+    @Test func deleteAllDataClearsTheExperienceState() async throws {
+        let (model, _) = makeModel(at: date(2026, 11, 21, 10))
+        let name = "tells.appmodel.test.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        defaults.set("fewerSwitches", forKey: "tells.experiment.change")
+        defaults.set(20261122, forKey: "tells.experiment.start")
+        defaults.set(3, forKey: "tells.youVsMac.real.you")
+        defaults.set(2, forKey: "tells.youVsMac.practice.mac")
+        defaults.set(20261121, forKey: "tells.youVsMac.forecastDay")
+        defaults.set(4, forKey: "tells.youVsMac.forecastValue")
+
+        try await model.deleteAllData(defaults: defaults)
+
+        for key in ["tells.experiment.change", "tells.experiment.start", "tells.youVsMac.real.you",
+                    "tells.youVsMac.practice.mac", "tells.youVsMac.forecastDay", "tells.youVsMac.forecastValue"] {
+            #expect(defaults.object(forKey: key) == nil, "\(key)")
+        }
+    }
+
     @Test func deleteAllDataWithoutAStoreDoesNothing() async throws {
         let (model, _) = makeModel(at: date(2026, 11, 21, 10))
         try await model.deleteAllData()

@@ -37,14 +37,18 @@ final class TellsApp {
             keyboardAvailability: { [weak model] in model?.keyboardAvailability ?? .available },
             openPermissions: { [weak model] in model?.showOnboarding() })
         let whatIf = WhatIfExperience()
+        let experiment = ExperimentExperience()
         let experiences: [any InsightExperience] = [YouVsMacExperience(), typingSound, GhostRacerExperience(), whatIf,
-                                                    HapticWeekExperience()]
-            + PlaceholderExperience.all().filter { $0.menuOrder > 5 }
+                                                    HapticWeekExperience(), experiment]
+            + PlaceholderExperience.all().filter { $0.menuOrder > 6 }
         let insights = InsightsWindowController(
             experiences: experiences, contextProvider: { [weak model] in model?.makeInsightContext() },
             onKeyChange: { [weak model] isKey in model?.setInsightsWindowIsKey(isKey) })
-        // "Test it" opens the Experiment. P4.4.6 selects the matching change.
-        whatIf.openExperiment = { [weak insights] _ in insights?.show(experienceID: "experiment") }
+        // "Test it" opens the Experiment with the matching change selected (D-102).
+        whatIf.openExperiment = { [weak insights, weak experiment] sliderID in
+            experiment?.preselect(sliderID: sliderID)
+            insights?.show(experienceID: "experiment")
+        }
         let menu = RadialMenuController(companion: panel, experiences: experiences,
                                         contextProvider: { [weak model] in model?.makeInsightContext() })
         menu.onChoose = { [weak insights] id in insights?.show(experienceID: id) }
@@ -70,6 +74,7 @@ final class TellsApp {
         model.onShowCheckIn = { [weak checkIn] in checkIn?.show() }
         self.checkIn = checkIn
         YouVsMacExperience.purgeStaleForecast(today: model.today)
+        ExperimentExperience.purgeStaleRecord(today: model.today)   // D-100
         model.startCollection()
         self.model = model
         menuBar = MenuBarController(model: model)

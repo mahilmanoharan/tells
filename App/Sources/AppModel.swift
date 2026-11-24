@@ -153,7 +153,10 @@ final class AppModel {
             // A closed window changes the drift and scattered data (SPEC.md Section 5).
             collectionTasks.append(Task { [weak self] in
                 for await _ in windowCloses {
-                    if let today = self?.today { YouVsMacExperience.purgeStaleForecast(today: today) }   // D-094
+                    if let today = self?.today {
+                        YouVsMacExperience.purgeStaleForecast(today: today)   // D-094
+                        ExperimentExperience.purgeStaleRecord(today: today)   // D-100
+                    }
                     await self?.refreshCompanionState()
                 }
             })
@@ -422,7 +425,10 @@ final class AppModel {
     }
 
     /// Deletes all saved data, including the daily summaries (SPEC.md 4.3). The caller asks the user first.
-    func deleteAllData() async throws {
+    func deleteAllData(defaults: UserDefaults = .standard) async throws {
+        // The experience state goes too: the experiment record, the forecast and the scores.
+        ExperimentExperience.clearStoredState(defaults: defaults)
+        YouVsMacExperience.clearStoredState(defaults: defaults)
         try await store?.deleteAll()
     }
 
